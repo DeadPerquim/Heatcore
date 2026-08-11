@@ -113,6 +113,7 @@
 ## Core Gameplay Mechanics Brief
 
   - <Gameplay Mechanic #1> - Espectadores
+    
     Espectadores poderão atrapalhar ou ajudar os jogadores, desacelerando um ou apagando as luzes da fase.
 
 ## Targeted platforms
