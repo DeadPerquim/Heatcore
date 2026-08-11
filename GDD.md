@@ -48,6 +48,7 @@
   - Core Gameplay Mechanics (Detailed)
     
     - Espectadores
+      
       Espectadores poderão atrapalhar ou ajudar os jogadores, desacelerando um ou apagando as luzes da fase.
 
       
@@ -164,28 +165,33 @@
 ## The elevator Pitch
 [A one sentence pitch for your game.]
 Pretend that your were pitching your game to a executive going to the elevator. You have less than 60 Seconds.
+
     Um jogo de plataforma de corrida inspirado no Multiplayer do Super Meat Boy onde dois jogadores correm
     em fases para ver quem completa primeiro, enquanto os telespectadores atrapalham ou ajudam quem quiserem.
 
 ## Project Description (Brief):
 [Two Paragraphs at least]
 [No more than three paragraphs]
+
     Um jogo de plataforma entre corrida de dois jogadores com espectadores apoiando ou atrapalhando o jogador
     que desejam.
 
 ## Project Description (Detailed)
 [Four Paragraphs or more If needs be]
 [No more than six paragraphs]
+
     Um jogo de plataforma entre corrida de dois robos em um cenario tecnologico no subsolo com espectadores
     apoiando ou atrapalhando o jogador que desejam enquanto os dois jogadores tentam passar fases espelhadas,
     um indo da esquerda embaixo para direita encima, o outro da direita encima para esquerda embaixo.
 
 # What sets this project apart?
     - Espectadores
+    
     Espectadores assistindo os dois jogadores passando as fazes poderão atrapalhar ou ajudar os jogadores, 
     desacelerando um ou apagando as luzes da fase por exemplo.
 
 ## Core Gameplay Mechanics (Detailed)
+
   - [Core Gameplay Mechanic #1] - Espectadores
     - [Details] Espectadores assistindo o jogo poderão participar do jogo ajudando ou atrapalhando os jogadores.
     - [How it works] Planejamos inicialmente fazer o celular dos espectadores funcionar quinem um controle para fazer ações dentro do jogo.
@@ -194,6 +200,7 @@ Pretend that your were pitching your game to a executive going to the elevator. 
 
 ## Story (Brief)
 [The Summary or TL;DR version of below]
+
     Dois robos com suas revervas de energia acabando e a humanidade morta correm contra o tempo em uma corrida
     para não morrerem por falta de energia.
 
@@ -201,6 +208,7 @@ Pretend that your were pitching your game to a executive going to the elevator. 
 [Go into as much detail as needs be]
 [Spare no detail]
 [Use Mind Mapping software to get your point across]
+
     Um jogo em um cenario de fabrica Solarpunk no subsolo construido em oque era antigamente uma mina de carvão um robo
     de energia solar acorda sozinho na parte mais profunda dessa fabrica e para não ficar sem energia e efetivamente
     morrendo ele começa á ir para a saida dessa fabrica no subsolo, enquanto isso um robo movido á carvão que na antiguidade
@@ -212,6 +220,7 @@ Pretend that your were pitching your game to a executive going to the elevator. 
 
 ## Gameplay (Brief)
 [The Summary version of below]
+
     Um jogo de plataforma entre corrida de dois jogadores com espectadores apoiando ou atrapalhando o jogador
     que desejam.
 
@@ -219,6 +228,7 @@ Pretend that your were pitching your game to a executive going to the elevator. 
 [Go into as much detail as needs be]
 [Spare no detail]
 [Combine this with the game mechanics section above]
+
     Um jogo de plataforma entre corrida de dois robos em um cenario tecnologico no subsolo com espectadores
     apoiando ou atrapalhando o jogador que desejam enquanto os dois jogadores tentam passar fases espelhadas,
     um indo da esquerda embaixo para direita encima, o outro da direita encima para esquerda embaixo.
