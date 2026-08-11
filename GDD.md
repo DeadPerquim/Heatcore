@@ -2,48 +2,63 @@
 
 - Overview
   - Theme / Setting / Genre:
+  - 
     Solarpunk e Steampunk
     
   - Core Gameplay Mechanics Brief:
+  - 
     Fases/Leveis de plataforma em uma corrida em quem completa primeiro a fase.
     
   - Targeted platforms:
+  - 
     PC e Desktop
     
   - Monetization model (Brief/Document):
+  - 
     Nenhum modelo de monetização foi considerado ainda.
     
   - Project Scope:
+  - 
     Planejamos manter o jogo o mais simplificado possível focando essencial e principalmente
     em corrida de plataforma entre dois jogadores.
 
   - Influences (Brief):
+ 
     - Super Meat Boy (Gameplay)
+    
     - Fireboy and Watergirl (Design)
       
   - The elevator Pitch:
+    
     Um jogo de plataforma de corrida inspirado no Multiplayer do Super Meat Boy onde dois jogadores correm
     em fases para ver quem completa primeiro, enquanto os telespectadores atrapalham ou ajudam quem quiserem.
     
   - Project Description (Brief):
+    
     Um jogo de plataforma entre corrida de dois jogadores com espectadores apoiando ou atrapalhando o jogador
     que desejam.
 
   - Project Description (Detailed):
+    
     Um jogo de plataforma entre corrida de dois robos em um cenario tecnologico no subsolo com espectadores
     apoiando ou atrapalhando o jogador que desejam enquanto os dois jogadores tentam passar fases espelhadas,
     um indo da esquerda embaixo para direita encima, o outro da direita encima para esquerda embaixo.
     
 - What sets this project apart?
   - Core Gameplay Mechanics (Detailed)
+    
     - Espectadores
       Espectadores poderão atrapalhar ou ajudar os jogadores, desacelerando um ou apagando as luzes da fase.
+
+      
 - Story and Gameplay
   - Story (Brief):
+    
     Dois robos com suas revervas de energia acabando e a humanidade morta correm contra o tempo em uma corrida
     para não morrerem por falta de energia.
     
   - Story (Detailed):
+    
     Um jogo em um cenario de fabrica Solarpunk no subsolo construido em oque era antigamente uma mina de carvão um robo
     de energia solar acorda sozinho na parte mais profunda dessa fabrica e para não ficar sem energia e efetivamente
     morrendo ele começa á ir para a saida dessa fabrica no subsolo, enquanto isso um robo movido á carvão que na antiguidade
@@ -54,24 +69,36 @@
     o sistema de segurança dessa fabrica não tornara essa corrida contra o tempo um passeio no parque.
 
   - Gameplay (Brief):
+    
     Um jogo de plataforma entre corrida de dois jogadores com espectadores apoiando ou atrapalhando o jogador
     que desejam.
     
   - Gameplay (Detailed):
+    
     Um jogo de plataforma entre corrida de dois robos em um cenario tecnologico no subsolo com espectadores
     apoiando ou atrapalhando o jogador que desejam enquanto os dois jogadores tentam passar fases espelhadas,
     um indo da esquerda embaixo para direita encima, o outro da direita encima para esquerda embaixo.
     
 - Assets Needed
+  
   - 2D
+  
     Iremos montar os assets nós mesmos.
+  
   - Sound
+    
     Iremos utilizar um Soundpack já existente e de graça.
+    
   - Code
+    
     Iremos programar o jogo nós mesmos.
+  
   - Animation
+    
     Iremos fazer as animações nós mesmos.
+    
 - Schedule
+  
   - O planejamento é terminarmos o projeto nas semanas finais de Novembro.
 
 
