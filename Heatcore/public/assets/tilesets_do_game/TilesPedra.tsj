@@ -1,0 +1,14 @@
+{ "columns":5,
+ "image":"..\/sprites\/environment\/TilesPedra.png",
+ "imageheight":48,
+ "imagewidth":80,
+ "margin":0,
+ "name":"TilesPedra",
+ "spacing":0,
+ "tilecount":15,
+ "tiledversion":"1.12.1",
+ "tileheight":16,
+ "tilewidth":16,
+ "type":"tileset",
+ "version":"1.10"
+}
