@@ -1,3 +1,5 @@
+import Phaser from 'phaser';
+
 const config = {
     type: Phaser.AUTO,
     width: 800,
@@ -14,13 +16,14 @@ const game = new Phaser.Game(config);
 function preload() {
 
     // 1. Carrega a imagem contendo os tiles (a textura em PNG)
-    this.load.image('FundoMetal', 'Heatcore/public/assets/sprites/background-images/FundoMetal.png');
-    this.load.image('Personagens', 'Heatcore/public/assets/sprites/characters/Personagens.png');
-    this.load.image('texturas_tileset1', 'Heatcore/public/assets/sprites/environment/testuras_tileset1.png');
-    this.load.image('TilesPedra', 'Heatcore/public/assets/sprites/environment/TilesPedra.png');
+    // Caminho relativo à raiz servida pelo Parcel (pasta "public", ver staticFiles no package.json)
+    this.load.image('FundoMetal', 'assets/sprites/background-images/FundoMetal.png');
+    this.load.image('Personagens', 'assets/sprites/characters/Personagens.png');
+    this.load.image('texturas_tileset1', 'assets/sprites/environment/texturas_tileset1.png');
+    this.load.image('TilesPedra', 'assets/sprites/environment/TilesPedra.png');
 
     // 2. Carrega o arquivo JSON (ou TMJ) exportado com os dados do mapa
-    this.load.tilemapTiledJSON('Mapa1', 'Heatcore/public/assets/maps/_mapasdojogo/Mapa1.tmj');
+    this.load.tilemapTiledJSON('Mapa1', 'assets/maps/_mapasdojogo/Mapa1.tmj');
 }
 
 function create() {
@@ -44,8 +47,9 @@ function create() {
     const camadaCenario = map.createLayer('CenarioDeFundo', todosOsTilesets, 0, 0);
     const camadaLimites = map.createLayer('Limites', todosOsTilesets, 0, 0);
     const camadaObjetos = map.createLayer('Objetos', todosOsTilesets, 0, 0);
-    const camadaForeground = map.createLayer('Foreground', todosOsTilesets, 0, 0);}
+    const camadaForeground = map.createLayer('Foreground', todosOsTilesets, 0, 0);
+}
 
-    function update() {
+function update() {
     // Lógica de atualização frame a frame do seu jogo
-    }
+}
