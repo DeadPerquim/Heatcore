@@ -1,3 +1,9 @@
+import StartGame from "./game/main";
+
+document.addEventListener("DOMContentLoaded", () => {
+  StartGame("game-container");
+});
+
 import Phaser from 'phaser';
 
 const config = {
@@ -13,18 +19,7 @@ const config = {
 
 const game = new Phaser.Game(config);
 
-function preload() {
 
-    // 1. Carrega a imagem contendo os tiles (a textura em PNG)
-    // Caminho relativo à raiz servida pelo Parcel (pasta "public", ver staticFiles no package.json)
-    this.load.image('FundoMetal', 'assets/sprites/background-images/FundoMetal.png');
-    this.load.image('Personagens', 'assets/sprites/characters/Personagens.png');
-    this.load.image('texturas_tileset1', 'assets/sprites/environment/texturas_tileset1.png');
-    this.load.image('TilesPedra', 'assets/sprites/environment/TilesPedra.png');
-
-    // 2. Carrega o arquivo JSON (ou TMJ) exportado com os dados do mapa
-    this.load.tilemapTiledJSON('Mapa1', 'assets/maps/_mapasdojogo/Mapa1.tmj');
-}
 
 function create() {
     // 3. Instancia o mapa usando a chave que você definiu no preload
