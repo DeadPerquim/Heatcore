@@ -6,24 +6,31 @@ export class Game extends Scene {
   }
 
   create() {
-    // 3. Instancia o mapa usando a chave que você definiu no preload
+    // Cria o mapa
     const map = this.make.tilemap({ key: "Mapa1" });
 
-    // 4. Conecta a imagem carregada ao Tileset configurado no Tiled
-    // ATENÇÃO: 'NomeDoTilesetNoTiled' deve ser EXATAMENTE o nome dado ao tileset dentro do software de mapa.
-    const tilesetFundoMetal = map.addTilesetImage("FundoMetal", "FundoMetal");
+    // Conecta os tilesets
+    const tilesetFundoMetal = map.addTilesetImage(
+      "FundoMetal",
+      "FundoMetal"
+    );
+
     const tilesetPersonagens = map.addTilesetImage(
       "Personagens",
-      "Personagens",
+      "Personagens"
     );
+
     const tilesetTexturas1 = map.addTilesetImage(
       "texturas_tileset1",
-      "texturas_tileset1",
+      "texturas_tileset1"
     );
-    const tilesetPedra = map.addTilesetImage("TilesPedra", "TilesPedra");
 
-    // 5. Cria a camada (layer) do mapa para ser renderizada na tela
-    // 'NomeDaCamadaNoTiled' também deve ser o nome exato da camada criada no editor.
+    const tilesetPedra = map.addTilesetImage(
+      "TilesPedra",
+      "TilesPedra"
+    );
+
+    // Lista de tilesets
     const todosOsTilesets = [
       tilesetFundoMetal,
       tilesetPersonagens,
@@ -31,26 +38,57 @@ export class Game extends Scene {
       tilesetPedra,
     ];
 
-    // Agora, criamos as camadas na ordem em que devem aparecer (do fundo para a frente).
-    // O nome em texto DEVE ser exatamente igual ao que está na sua lista do Tiled.
-    const camadaPedras = map.createLayer("Pedras", todosOsTilesets, 0, 0);
-    const camadaCenario = map.createLayer(
+    // Cria as camadas
+    map.createLayer(
+      "Pedras",
+      todosOsTilesets,
+      0,
+      0
+    );
+
+    map.createLayer(
       "CenarioDeFundo",
       todosOsTilesets,
       0,
-      0,
+      0
     );
-    const camadaLimites = map.createLayer("Limites", todosOsTilesets, 0, 0);
-    const camadaObjetos = map.createLayer("Objetos", todosOsTilesets, 0, 0);
-    const camadaForeground = map.createLayer(
+
+    map.createLayer(
+      "Limites",
+      todosOsTilesets,
+      0,
+      0
+    );
+
+    map.createLayer(
+      "Objetos",
+      todosOsTilesets,
+      0,
+      0
+    );
+
+    map.createLayer(
       "Foreground",
       todosOsTilesets,
       0,
-      0,
+      0
     );
+
+    const camera = this.cameras.main;
+
+    // Desloca o mapa para a esquerda.
+    // O valor é em coordenadas do jogo (800x450).
+    camera.setScroll(60, 150);
+
+    // Informações para conferirmos no Console
+    console.log("=== INFORMAÇÕES DO MAPA ===");
+    console.log("Mapa:", map.widthInPixels, "x", map.heightInPixels);
+    console.log("Câmera:", camera.width, "x", camera.height);
+    console.log("Scroll X:", camera.scrollX);
+    console.log("Scroll Y:", camera.scrollY);
   }
 
   update() {
-    // Lógica de atualização frame a frame do seu jogo
+    // Lógica de atualização frame a frame do jogo
   }
 }
