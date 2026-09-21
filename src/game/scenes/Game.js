@@ -34,8 +34,8 @@ export class Game extends Phaser.Scene {
         // 2. CRIAÇÃO DO JOGADOR
         // ==========================================
         // Usamos uma sprite inicial, por exemplo, o sprite de 'andando'
-        this.solar = this.physics.add.sprite(100, 100, 'solar_andando');
-        this.solar.setCircle(16); 
+        this.solar = this.physics.add.sprite(247.5, 520, 'solar_andando');
+        this.solar.setCircle(8); 
         this.solar.setCollideWorldBounds(true);
 
         // ==========================================
@@ -52,20 +52,26 @@ export class Game extends Phaser.Scene {
         // ==========================================
         this.anims.create({
             key: 'walk',
-            frames: this.anims.generateFrameNumbers('solar_andando', { start: 0, end: 3 }),
+            frames: this.anims.generateFrameNumbers('solar_andando', { start: 0, end: 2 }), // Lê apenas a primeira linha
             frameRate: 10,
             repeat: -1
         });
 
         this.anims.create({
             key: 'jump',
-            frames: this.anims.generateFrameNumbers('solar_pulando', { start: 0, end: 0 }),
+            frames: this.anims.generateFrameNumbers('solar_pulando', { start: 2, end:  2}), // Substitua 1 pelo quadro correto do pulo
+            frameRate: 100
+        });
+
+        this.anims.create({
+            key: 'fall',
+            frames: this.anims.generateFrameNumbers('solar_caindo', { start: 2, end: 2 }), // Substitua 2 pelo quadro correto dele olhando para baixo
             frameRate: 10
         });
 
         this.anims.create({
             key: 'wallSlide',
-            frames: this.anims.generateFrameNumbers('solar_deslizando', { start: 0, end: 0 }),
+            frames: this.anims.generateFrameNumbers('solar_deslizando', { start: 1, end: 1 }),
             frameRate: 10
         });
 
@@ -75,49 +81,67 @@ export class Game extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
     }
 
-    update() {
-        if (!this.solar || !this.solar.body) return;
+update() {
+if (!this.solar || !this.solar.body) return;
 
         const body = this.solar.body;
-        
-        const isGrounded = body.blocked.down;
+        const noChao = body.blocked.down || body.touching.down || body.onFloor();
+        const apertouPulo = this.cursors.up.isDown || this.cursors.space.isDown;
         const isTouchingWall = body.blocked.left || body.blocked.right;
         const isFalling = body.velocity.y > 0;
         
-        // MOVIMENTAÇÃO HORIZONTAL
-        if (this.cursors.left.isDown) {
-            this.solar.setVelocityX(-160);
-            this.solar.setFlipX(true);
-        } else if (this.cursors.right.isDown) {
-            this.solar.setVelocityX(160);
-            this.solar.setFlipX(false);
-        } else {
-            this.solar.setVelocityX(0);
+        // ==========================================
+        // 1. FÍSICA E MOVIMENTO (Apenas setVelocity)
+        // ==========================================
+        
+        // Pulo
+        if (apertouPulo && noChao) {
+            this.solar.setVelocityY(-400); 
         }
 
-        // PULO
-        if (Phaser.Input.Keyboard.JustDown(this.cursors.up) && isGrounded) {
-            this.solar.setVelocityY(-350);
-        }
-
-        // WALL SLIDE
-        if (isTouchingWall && !isGrounded && isFalling) {
+        // Wall Slide
+        if (isTouchingWall && !noChao && isFalling) {
             this.solar.setVelocityY(50); 
         }
 
-        // GERENCIADOR DE ANIMAÇÕES
-        if (isTouchingWall && !isGrounded && isFalling) {
+        // Movimento Horizontal
+        if (this.cursors.left.isDown) {
+            this.solar.setVelocityX(-160);
+            this.solar.setFlipX(true);
+        } 
+        else if (this.cursors.right.isDown) {
+            this.solar.setVelocityX(160);
+            this.solar.setFlipX(false);
+        } 
+        else {
+            this.solar.setVelocityX(0);
+        }
+
+        // ==========================================
+        // 2. GERENCIADOR DE ANIMAÇÕES (Apenas anims.play)
+        // ==========================================
+        
+        // A ordem dos 'if' define a prioridade. Ações no ar importam mais que no chão.
+        if (isTouchingWall && !noChao && isFalling) {
             this.solar.anims.play('wallSlide', true);
         } 
-        else if (!isGrounded) {
-            this.solar.anims.play('jump', true); 
+        else if (!noChao) {
+            // Se não está no chão, está no ar (pulando ou caindo)
+            if (body.velocity.y < 0) {
+                this.solar.anims.play('jump', true);
+            } else {
+                this.solar.anims.play('fall', true);
+            }
         } 
         else if (body.velocity.x !== 0) {
+            // Se está no chão e com velocidade, está andando
             this.solar.anims.play('walk', true);
         } 
         else {
+            // Se está no chão e parado
             this.solar.anims.stop();
-            // Nota: Se você tiver uma spritesheet "idle/parado", o ideal é tocá-la aqui.
+            // Volta para a textura original caso a última animação pare em um frame estranho
+            this.solar.setTexture('solar_andando', 0); 
         }
     }
 }
