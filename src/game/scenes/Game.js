@@ -86,9 +86,15 @@ if (!this.solar || !this.solar.body) return;
 
         const body = this.solar.body;
         const noChao = body.blocked.down || body.touching.down || body.onFloor();
-        const apertouPulo = this.cursors.up.isDown || this.cursors.space.isDown;
+        const apertouPulo = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space);        
         const isTouchingWall = body.blocked.left || body.blocked.right;
         const isFalling = body.velocity.y > 0;
+        const tocandoParedeEsquerda = body.blocked.left;
+        const tocandoParedeDireita = body.blocked.right;
+        const estaNaParede = (tocandoParedeEsquerda || tocandoParedeDireita) && !noChao && isFalling;
+        const naParedEsquerda = body.blocked.left || body.touching.left;
+        const naParedDireita = body.blocked.right || body.touching.right;
+        const estaNoAr = !noChao;
         
         // ==========================================
         // 1. FÍSICA E MOVIMENTO (Apenas setVelocity)
@@ -98,23 +104,43 @@ if (!this.solar || !this.solar.body) return;
         if (apertouPulo && noChao) {
             this.solar.setVelocityY(-400); 
         }
+        // PULO NA PAREDE (Wall Jump)
+        if (apertouPulo && !noChao) {
+            if (body.blocked.left && this.cursors.right.isDown) {
+                this.solar.setVelocityX(220);   // Impulso para a direita
+                this.solar.setVelocityY(-380);  // Impulso para cima
+                
+                // Forçamos uma pequena trava para o teclado não anular o impulso imediatamente
+                this.timeWarp = true; 
+                this.time.delayedCall(150, () => { this.timeWarp = false; }); 
+            }
+            else if (body.blocked.right && this.cursors.left.isDown) {
+                this.solar.setVelocityX(-220);  // Impulso para a esquerda
+                this.solar.setVelocityY(-380);  // Impulso para cima
+                
+                this.timeWarp = true;
+                this.time.delayedCall(150, () => { this.timeWarp = false; });
+            }
+        }
 
         // Wall Slide
-        if (isTouchingWall && !noChao && isFalling) {
-            this.solar.setVelocityY(50); 
+        if (estaNaParede) {
+            this.solar.setVelocityY(50); // Controla a velocidade de queda na parede
         }
 
         // Movimento Horizontal
-        if (this.cursors.left.isDown) {
-            this.solar.setVelocityX(-160);
-            this.solar.setFlipX(true);
-        } 
-        else if (this.cursors.right.isDown) {
-            this.solar.setVelocityX(160);
-            this.solar.setFlipX(false);
-        } 
-        else {
-            this.solar.setVelocityX(0);
+        if (!this.timeWarp) {
+            if (this.cursors.left.isDown) {
+                this.solar.setVelocityX(-160);
+                this.solar.setFlipX(true);
+            } 
+            else if (this.cursors.right.isDown) {
+                this.solar.setVelocityX(160);
+                this.solar.setFlipX(false);
+            } 
+            else {
+                this.solar.setVelocityX(0);
+            }
         }
 
         // ==========================================
