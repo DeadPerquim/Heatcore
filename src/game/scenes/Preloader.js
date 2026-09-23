@@ -24,6 +24,7 @@ export class Preloader extends Phaser.Scene {
     this.load.image('Personagens', './assets/sprites/characters/Personagens.png');
     this.load.image('texturas_tileset1', './assets/sprites/environment/texturas_tileset1.png');
     this.load.image('TilesPedra', './assets/sprites/environment/TilesPedra.png');
+    this.load.image('Espinhos', './assets/sprites/environment/Espinhos.png');
 
     // 2. CARREGAR OS SPRITESHEETS DO PERSONAGEM (Com chaves únicas)
     this.load.spritesheet('solar_andando', './assets/sprites/characters/Solar/Andando.png', { frameWidth: 16, frameHeight: 16 });

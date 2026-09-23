@@ -14,9 +14,10 @@ export class Game extends Phaser.Scene {
         const tsPersonagens = map.addTilesetImage('Personagens', 'Personagens');
         const tsTexturas = map.addTilesetImage('texturas_tileset1', 'texturas_tileset1');
         const tsPedras = map.addTilesetImage('TilesPedra', 'TilesPedra');
+        const tsEspinhos = map.addTilesetImage('Espinhos', 'Espinhos');
 
         // Cria um array com todos os tilesets para passar para as camadas
-        const arrayTilesets = [tsFundo, tsPersonagens, tsTexturas, tsPedras];
+        const arrayTilesets = [tsFundo, tsPersonagens, tsTexturas, tsPedras, tsEspinhos];
 
         // Cria as camadas informando o array com todos os tilesets
         const layerPedras = map.createLayer('Pedras', arrayTilesets, 0, 0);
@@ -27,8 +28,38 @@ export class Game extends Phaser.Scene {
 
         // A camada 'Limites' é a responsável pela colisão, como você configurou
         layerLimites.setCollisionByExclusion([-1]);
+        layerObjetos.setCollisionByExclusion([-1]);
         
         this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+
+        // ==========================================
+        // ESCURIDÃO COM FURO CIRCULAR (Canvas Texture)
+        // ==========================================
+
+        const largura = 2500; // Tamanho suficiente para cobrir toda a visão do mapa
+        const altura = 2500;
+        const raioLuz = 24;   // Ajuste o tamanho do círculo de luz aqui (ex: 20, 24, 32)
+
+        // 1. Cria uma textura em memória via Canvas nativo
+        const canvasTexture = this.textures.createCanvas('escuridaoComFuro', largura, altura);
+        const ctx = canvasTexture.context;
+
+        // 2. Pinta o quadrado de preto semi-transparente (0.9 de opacidade)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillRect(0, 0, largura, altura);
+
+        // 3. Fura um círculo perfeito exatamente no centro
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        ctx.arc(largura / 2, altura / 2, raioLuz, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 4. Atualiza a textura no Phaser
+        canvasTexture.refresh();
+
+        // 5. Cria a imagem no jogo centralizada no personagem Solar
+        this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro');
+        this.escuridaoSprite.setDepth(100);
 
         // ==========================================
         // 2. CRIAÇÃO DO JOGADOR
@@ -43,6 +74,7 @@ export class Game extends Phaser.Scene {
         // ==========================================
         // Correção do colisor: antes era layerChao, o correto é layerLimites
         this.physics.add.collider(this.solar, layerLimites);
+        this.physics.add.collider(this.solar, layerObjetos);
 
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.cameras.main.startFollow(this.solar);
@@ -169,5 +201,9 @@ if (!this.solar || !this.solar.body) return;
             // Volta para a textura original caso a última animação pare em um frame estranho
             this.solar.setTexture('solar_andando', 0); 
         }
+
+if (this.escuridaoSprite && this.solar) {
+    this.escuridaoSprite.setPosition(this.solar.x, this.solar.y);
+}
     }
 }
