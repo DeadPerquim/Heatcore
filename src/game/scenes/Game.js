@@ -44,6 +44,7 @@ export class Game extends Phaser.Scene {
         const canvasTexture = this.textures.createCanvas('escuridaoComFuro', largura, altura);
         const ctx = canvasTexture.context;
 
+
         // 2. Pinta o quadrado de preto semi-transparente (0.9 de opacidade)
         ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
         ctx.fillRect(0, 0, largura, altura);
@@ -57,10 +58,6 @@ export class Game extends Phaser.Scene {
         // 4. Atualiza a textura no Phaser
         canvasTexture.refresh();
 
-        // 5. Cria a imagem no jogo centralizada no personagem Solar
-        this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro');
-        this.escuridaoSprite.setDepth(100);
-
         // ==========================================
         // 2. CRIAÇÃO DO JOGADOR
         // ==========================================
@@ -70,11 +67,17 @@ export class Game extends Phaser.Scene {
         this.solar.setCollideWorldBounds(true);
 
         // ==========================================
+        // 2.1 CRIAÇÃO DOS TELEPORTADORES DE FASE 
+        // ==========================================
+        this.teleporter = this.add.sprite(210, 510, 'corredorEsquerdo');
+        this.teleporter = this.add.sprite(720, 290, 'corredorDireito');
+
+        // ==========================================
         // 3. COLISÕES E CÂMERA
         // ==========================================
-        // Correção do colisor: antes era layerChao, o correto é layerLimites
         this.physics.add.collider(this.solar, layerLimites);
         this.physics.add.collider(this.solar, layerObjetos);
+        this.physics.add.overlap(this.solar, this.teleporter, this.irParaProximaFase, null, this)
 
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.cameras.main.startFollow(this.solar);
@@ -118,7 +121,7 @@ if (!this.solar || !this.solar.body) return;
 
         const body = this.solar.body;
         const noChao = body.blocked.down || body.touching.down || body.onFloor();
-        const apertouPulo = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space);        
+        const apertouPulo = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space);     
         const isTouchingWall = body.blocked.left || body.blocked.right;
         const isFalling = body.velocity.y > 0;
         const tocandoParedeEsquerda = body.blocked.left;
@@ -127,46 +130,46 @@ if (!this.solar || !this.solar.body) return;
         const naParedEsquerda = body.blocked.left || body.touching.left;
         const naParedDireita = body.blocked.right || body.touching.right;
         const estaNoAr = !noChao;
+        this.apertouE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.apertouW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+        this.apertouA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+        this.apertouS = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+        this.apertouD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+        this.apertouP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
+
         
         // ==========================================
         // 1. FÍSICA E MOVIMENTO (Apenas setVelocity)
         // ==========================================
         
         // Pulo
-        if (apertouPulo && noChao) {
+        if (apertouPulo && noChao || (this.apertouW.isDown) && noChao) {
             this.solar.setVelocityY(-400); 
-        }
-        // PULO NA PAREDE (Wall Jump)
-        if (apertouPulo && !noChao) {
-            if (body.blocked.left && this.cursors.right.isDown) {
-                this.solar.setVelocityX(220);   // Impulso para a direita
-                this.solar.setVelocityY(-380);  // Impulso para cima
-                
-                // Forçamos uma pequena trava para o teclado não anular o impulso imediatamente
-                this.timeWarp = true; 
-                this.time.delayedCall(150, () => { this.timeWarp = false; }); 
-            }
-            else if (body.blocked.right && this.cursors.left.isDown) {
-                this.solar.setVelocityX(-220);  // Impulso para a esquerda
-                this.solar.setVelocityY(-380);  // Impulso para cima
-                
-                this.timeWarp = true;
-                this.time.delayedCall(150, () => { this.timeWarp = false; });
-            }
         }
 
         // Wall Slide
         if (estaNaParede) {
             this.solar.setVelocityY(50); // Controla a velocidade de queda na parede
         }
+        
+        if (apertouPulo && estaNaParede || (this.apertouW.isDown) && estaNaParede) {
+            if (this.cursors.right.isDown || (this.apertouD.isDown)) {
+                this.solar.setVelocityX(220);   // Impulso para a direita
+                this.solar.setVelocityY(-380);  // Impulso para cima
+            }
+            else if (this.cursors.left.isDown || (this.apertouA.isDown)) {
+                this.solar.setVelocityX(-220);  // Impulso para a esquerda
+                this.solar.setVelocityY(-380);  // Impulso para cima
+            }
+        }
 
         // Movimento Horizontal
         if (!this.timeWarp) {
-            if (this.cursors.left.isDown) {
+            if (this.cursors.left.isDown || (this.apertouA.isDown)) {
                 this.solar.setVelocityX(-160);
                 this.solar.setFlipX(true);
             } 
-            else if (this.cursors.right.isDown) {
+            else if (this.cursors.right.isDown || (this.apertouD.isDown)) {
                 this.solar.setVelocityX(160);
                 this.solar.setFlipX(false);
             } 
@@ -202,8 +205,18 @@ if (!this.solar || !this.solar.body) return;
             this.solar.setTexture('solar_andando', 0); 
         }
 
-if (this.escuridaoSprite && this.solar) {
-    this.escuridaoSprite.setPosition(this.solar.x, this.solar.y);
-}
+        if (this.escuridaoSprite && this.solar) {
+            this.escuridaoSprite.setPosition(this.solar.x, this.solar.y);
+        }
+
+        if (Phaser.Input.Keyboard.JustDown(this.apertouE)) {
+            this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro');
+            this.escuridaoSprite.setDepth(100);
+        }
+
+        if (Phaser.Input.Keyboard.JustDown(this.apertouP)) {
+            this.scene.stop();
+            this.scene.start("Mapa2");
+        }
     }
 }
