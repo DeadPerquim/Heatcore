@@ -7,7 +7,7 @@ export class Mapa2 extends Phaser.Scene {
         // ==========================================
         // 1. CRIAÇÃO DO MAPA
         // ==========================================
-        const map = this.make.tilemap({ key: 'mapa' });
+        const map = this.make.tilemap({ key: 'mapa2' });
 
         // Declara cada tileset em uma variável única
         const tsFundo = map.addTilesetImage('FundoMetal', 'FundoMetal');
@@ -36,68 +36,81 @@ export class Mapa2 extends Phaser.Scene {
         // ESCURIDÃO COM FURO CIRCULAR (Canvas Texture)
         // ==========================================
 
-        const largura = 2500; // Tamanho suficiente para cobrir toda a visão do mapa
+        const largura = 2500; 
         const altura = 2500;
-        const raioLuz = 24;   // Ajuste o tamanho do círculo de luz aqui (ex: 20, 24, 32)
+        const raioLuz = 24;   
 
-        // 1. Cria uma textura em memória via Canvas nativo
-        const canvasTexture = this.textures.createCanvas('escuridaoComFuro', largura, altura);
-        const ctx = canvasTexture.context;
+        // Só cria a textura do canvas se ela ainda não existir no cache do jogo
+        if (!this.textures.exists('escuridaoComFuro')) {
+            const canvasTexture = this.textures.createCanvas('escuridaoComFuro', largura, altura);
+            const ctx = canvasTexture.context;
 
-        // 2. Pinta o quadrado de preto semi-transparente (0.9 de opacidade)
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-        ctx.fillRect(0, 0, largura, altura);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+            ctx.fillRect(0, 0, largura, altura);
 
-        // 3. Fura um círculo perfeito exatamente no centro
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.beginPath();
-        ctx.arc(largura / 2, altura / 2, raioLuz, 0, Math.PI * 2);
-        ctx.fill();
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.arc(largura / 2, altura / 2, raioLuz, 0, Math.PI * 2);
+            ctx.fill();
 
-        // 4. Atualiza a textura no Phaser
-        canvasTexture.refresh();
-
-        // 5. Cria a imagem no jogo centralizada no personagem Solar
-        this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro');
-        this.escuridaoSprite.setDepth(100);
+            canvasTexture.refresh();
+        }
 
         // ==========================================
-        // 2. CRIAÇÃO DO JOGADOR
+        // 2. CRIAÇÃO DOS PERSONAGENS (Solar e Fornalha)
         // ==========================================
-        // Usamos uma sprite inicial, por exemplo, o sprite de 'andando'
         this.solar = this.physics.add.sprite(247.5, 520, 'solar_andando');
         this.solar.setCircle(8); 
         this.solar.setCollideWorldBounds(true);
 
+        this.fornalha = this.physics.add.sprite(680, 300, 'Fornalha');
+        this.fornalha.setCircle(8);
+        this.fornalha.setCollideWorldBounds(true);
+
+        // Define o Solar como o personagem ativo inicial
+        this.jogadorAtual = this.solar;
+
+        // ==========================================
+        // 2.1 CRIAÇÃO DOS TELEPORTADORES DE FASE 
+        // ==========================================
+        this.teleporters = this.physics.add.staticGroup();
+
+        const teleporter1 = this.teleporters.create(210, 510, 'corredorEsquerdo').setVisible(false);
+        const teleporter2 = this.teleporters.create(720, 290, 'corredorDireito').setVisible(false);
+
         // ==========================================
         // 3. COLISÕES E CÂMERA
         // ==========================================
-        // Correção do colisor: antes era layerChao, o correto é layerLimites
         this.physics.add.collider(this.solar, layerLimites);
         this.physics.add.collider(this.solar, layerObjetos);
+        this.physics.add.collider(this.fornalha, layerLimites);
+        this.physics.add.collider(this.fornalha, layerObjetos);
+
+        this.physics.add.overlap(this.solar, teleporter2, this.irParaProximaFase, null, this);
+        this.physics.add.overlap(this.fornalha, teleporter1, this.irParaProximaFase, null, this);
 
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
-        this.cameras.main.startFollow(this.solar);
+        this.cameras.main.startFollow(this.jogadorAtual);
 
         // ==========================================
         // 4. ANIMAÇÕES (Adaptadas para múltiplas spritesheets)
         // ==========================================
         this.anims.create({
             key: 'walk',
-            frames: this.anims.generateFrameNumbers('solar_andando', { start: 0, end: 2 }), // Lê apenas a primeira linha
+            frames: this.anims.generateFrameNumbers('solar_andando', { start: 0, end: 2 }),
             frameRate: 10,
             repeat: -1
         });
 
         this.anims.create({
             key: 'jump',
-            frames: this.anims.generateFrameNumbers('solar_pulando', { start: 2, end:  2}), // Substitua 1 pelo quadro correto do pulo
+            frames: this.anims.generateFrameNumbers('solar_pulando', { start: 2, end: 2 }),
             frameRate: 100
         });
 
         this.anims.create({
             key: 'fall',
-            frames: this.anims.generateFrameNumbers('solar_caindo', { start: 2, end: 2 }), // Substitua 2 pelo quadro correto dele olhando para baixo
+            frames: this.anims.generateFrameNumbers('solar_caindo', { start: 2, end: 2 }),
             frameRate: 10
         });
 
@@ -111,99 +124,122 @@ export class Mapa2 extends Phaser.Scene {
         // 5. CONTROLES
         // ==========================================
         this.cursors = this.input.keyboard.createCursorKeys();
+        
+        // Teclas temporárias para alternar personagens (1 e 2)
+        this.tecla1 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
+        this.tecla2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
     }
 
-update() {
-if (!this.solar || !this.solar.body) return;
+    update() {
+        // ==========================================
+        // TROCA TEMPORÁRIA DE PERSONAGEM (TECLAS 1 E 2)
+        // ==========================================
+        if (Phaser.Input.Keyboard.JustDown(this.tecla1)) {
+            this.jogadorAtual = this.solar;
+            this.cameras.main.startFollow(this.solar);
+        } else if (Phaser.Input.Keyboard.JustDown(this.tecla2)) {
+            this.jogadorAtual = this.fornalha;
+            this.cameras.main.startFollow(this.fornalha);
+            // Zera a velocidade do solar ao desselecionar para ele não continuar andando sozinho
+            this.solar.setVelocityX(0);
+            this.solar.anims.stop();
+        }
 
-        const body = this.solar.body;
+        // A partir daqui, toda a lógica do update se aplica dinamicamente ao `this.jogadorAtual`
+        const activePlayer = this.jogadorAtual;
+        if (!activePlayer || !activePlayer.body) return;
+
+        const body = activePlayer.body;
         const noChao = body.blocked.down || body.touching.down || body.onFloor();
-        const apertouPulo = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space);        
+        const apertouPulo = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space);     
         const isTouchingWall = body.blocked.left || body.blocked.right;
         const isFalling = body.velocity.y > 0;
         const tocandoParedeEsquerda = body.blocked.left;
         const tocandoParedeDireita = body.blocked.right;
         const estaNaParede = (tocandoParedeEsquerda || tocandoParedeDireita) && !noChao && isFalling;
-        const naParedEsquerda = body.blocked.left || body.touching.left;
-        const naParedDireita = body.blocked.right || body.touching.right;
-        const estaNoAr = !noChao;
         
+        this.apertouE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.apertouW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+        this.apertouA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+        this.apertouS = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+        this.apertouD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+        this.apertouP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
+
         // ==========================================
         // 1. FÍSICA E MOVIMENTO (Apenas setVelocity)
         // ==========================================
         
         // Pulo
-        if (apertouPulo && noChao) {
-            this.solar.setVelocityY(-400); 
-        }
-        // PULO NA PAREDE (Wall Jump)
-        if (apertouPulo && !noChao) {
-            if (body.blocked.left && this.cursors.right.isDown) {
-                this.solar.setVelocityX(220);   // Impulso para a direita
-                this.solar.setVelocityY(-380);  // Impulso para cima
-                
-                // Forçamos uma pequena trava para o teclado não anular o impulso imediatamente
-                this.timeWarp = true; 
-                this.time.delayedCall(150, () => { this.timeWarp = false; }); 
-            }
-            else if (body.blocked.right && this.cursors.left.isDown) {
-                this.solar.setVelocityX(-220);  // Impulso para a esquerda
-                this.solar.setVelocityY(-380);  // Impulso para cima
-                
-                this.timeWarp = true;
-                this.time.delayedCall(150, () => { this.timeWarp = false; });
-            }
+        if ((apertouPulo && noChao) || (this.apertouW.isDown && noChao)) {
+            activePlayer.setVelocityY(-400); 
         }
 
         // Wall Slide
         if (estaNaParede) {
-            this.solar.setVelocityY(50); // Controla a velocidade de queda na parede
+            activePlayer.setVelocityY(50); 
+        }
+        
+        if ((apertouPulo && estaNaParede) || (this.apertouW.isDown && estaNaParede)) {
+            if (this.cursors.right.isDown || this.apertouD.isDown) {
+                activePlayer.setVelocityX(220);   
+                activePlayer.setVelocityY(-380);  
+            }
+            else if (this.cursors.left.isDown || this.apertouA.isDown) {
+                activePlayer.setVelocityX(-220);  
+                activePlayer.setVelocityY(-380);  
+            }
         }
 
         // Movimento Horizontal
         if (!this.timeWarp) {
-            if (this.cursors.left.isDown) {
-                this.solar.setVelocityX(-160);
-                this.solar.setFlipX(true);
+            if (this.cursors.left.isDown || this.apertouA.isDown) {
+                activePlayer.setVelocityX(-160);
+                activePlayer.setFlipX(true);
             } 
-            else if (this.cursors.right.isDown) {
-                this.solar.setVelocityX(160);
-                this.solar.setFlipX(false);
+            else if (this.cursors.right.isDown || this.apertouD.isDown) {
+                activePlayer.setVelocityX(160);
+                activePlayer.setFlipX(false);
             } 
             else {
-                this.solar.setVelocityX(0);
+                activePlayer.setVelocityX(0);
             }
         }
 
         // ==========================================
-        // 2. GERENCIADOR DE ANIMAÇÕES (Apenas anims.play)
+        // 2. GERENCIADOR DE ANIMAÇÕES (Apenas para o Solar por enquanto)
         // ==========================================
-        
-        // A ordem dos 'if' define a prioridade. Ações no ar importam mais que no chão.
-        if (isTouchingWall && !noChao && isFalling) {
-            this.solar.anims.play('wallSlide', true);
-        } 
-        else if (!noChao) {
-            // Se não está no chão, está no ar (pulando ou caindo)
-            if (body.velocity.y < 0) {
-                this.solar.anims.play('jump', true);
-            } else {
-                this.solar.anims.play('fall', true);
+        if (activePlayer === this.solar) {
+            if (isTouchingWall && !noChao && isFalling) {
+                activePlayer.anims.play('wallSlide', true);
+            } 
+            else if (!noChao) {
+                if (body.velocity.y < 0) {
+                    activePlayer.anims.play('jump', true);
+                } else {
+                    activePlayer.anims.play('fall', true);
+                }
+            } 
+            else if (body.velocity.x !== 0) {
+                activePlayer.anims.play('walk', true);
+            } 
+            else {
+                activePlayer.anims.stop();
+                activePlayer.setTexture('solar_andando', 0); 
             }
-        } 
-        else if (body.velocity.x !== 0) {
-            // Se está no chão e com velocidade, está andando
-            this.solar.anims.play('walk', true);
-        } 
-        else {
-            // Se está no chão e parado
-            this.solar.anims.stop();
-            // Volta para a textura original caso a última animação pare em um frame estranho
-            this.solar.setTexture('solar_andando', 0); 
         }
 
-if (this.escuridaoSprite && this.solar) {
-    this.escuridaoSprite.setPosition(this.solar.x, this.solar.y);
-}
+        if (this.escuridaoSprite && activePlayer) {
+            this.escuridaoSprite.setPosition(activePlayer.x, activePlayer.y);
+        }
+
+        if (Phaser.Input.Keyboard.JustDown(this.apertouE)) {
+            this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro');
+            this.escuridaoSprite.setDepth(100);
+        }
+    }
+
+    irParaProximaFase(jogador, teleportador) {
+        this.scene.stop('Mapa2');
+        this.scene.start('Mapa3');
     }
 }

@@ -18,10 +18,12 @@ export class Preloader extends Phaser.Scene {
   preload() {
     // 1. CARREGAR O MAPA
     this.load.tilemapTiledJSON('mapa', './assets/maps/_mapasdojogo/Mapa1.json');
+    this.load.tilemapTiledJSON('mapa2', './assets/maps/_mapasdojogo/Mapa2.json');
 
     // ATENÇÃO: As imagens devem ser arquivos de imagem (.png) e não os dados .tsj
     this.load.image('FundoMetal', './assets/sprites/background-images/FundoMetal.png');
     this.load.image('Personagens', './assets/sprites/characters/Personagens.png');
+    this.load.image('Fornalha', './assets/sprites/characters/Fornalha.png');
     this.load.image('texturas_tileset1', './assets/sprites/environment/texturas_tileset1.png');
     this.load.image('TilesPedra', './assets/sprites/environment/TilesPedra.png');
     this.load.image('Espinhos', './assets/sprites/environment/Espinhos.png');
