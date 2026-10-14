@@ -57,6 +57,8 @@ export class Preloader extends Scene {
     this.load.image('TilesPedra', './assets/sprites/environment/TilesPedra.png');
     this.load.image('Espinhos', './assets/sprites/environment/Espinhos.png');
     this.load.image('logo_heatcore', './assets/logo_heatcore.png');
+    this.load.image('preview_solar', 'assets/personagens/preview_solar.png');
+    this.load.image('preview_fornalha', 'assets/personagens/preview_fornalha.png');
 
     // 2. CARREGAR OS SPRITESHEETS DO PERSONAGEM (Com chaves únicas)
     this.load.spritesheet('solar_andando', './assets/sprites/characters/Solar/Andando.png', { frameWidth: 16, frameHeight: 16 });
@@ -66,6 +68,8 @@ export class Preloader extends Scene {
     this.load.spritesheet('solar_pulando', './assets/sprites/characters/Solar/Pulando.png', { frameWidth: 16, frameHeight: 16 });
 
     this.load.audio('boot_pc', './assets/audio/sfx/Old_90s_PC_boot_sequence.wav');
+    this.load.audio('caindo', './assets/audio/sfx/caindo.wav');
+    this.load.audio('menu', './assets/audio/music/menu.wav');
   }
 
   create() {

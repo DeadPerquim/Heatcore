@@ -112,10 +112,10 @@ export class Boot extends Scene {
 
     const linhasDoTerminal = [
       "Award Modular BIOS v4.51PG, An Energy Star Ally",
-      "Copyright (C) 1984-97, Award Software, Inc.",
+      "Copyright (C) 2042-56, Award Software, Inc.",
       "",
-      "PENTIUM-S CPU at 75MHz (Overclocked to 3200MHz)",
-      "Memory Test :  65536K OK",
+      "PENTIUM-S CPU at 1260MHz (Overclocked to 18200MHz)",
+      "Memory Test :  640GB OK",
       "",
       "Award Plug and Play BIOS Extension v1.0A",
       "Detecting IDE Primary Master  ... Heatcore_SSD [OK]",
@@ -129,7 +129,7 @@ export class Boot extends Scene {
       "Mounting Tiled JSON Maps & Spritesheets....... [OK]",
       "",
       "Press DEL to enter SETUP",
-      "12/10/2026-i430VX-UMC8669-2A59GH2BC-00",
+      "20/11/2026-i430VX-UMC8669-2A59GH2BC-00",
       "",
       "SYSTEM BOOT SUCCESSFUL. LOADING INTERFACE..."
     ];
