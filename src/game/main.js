@@ -10,6 +10,9 @@ const config = {
   type: AUTO,
   width: 800,
   height: 450,
+  input: {
+      gamepad: true
+  },
   parent: "game-container",
   backgroundColor: "#000000",
   physics: {

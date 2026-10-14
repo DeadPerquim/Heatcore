@@ -22,7 +22,7 @@ export class Game extends Phaser.Scene {
         // Cria as camadas informando o array com todos os tilesets
         const layerPedras = map.createLayer('Pedras', arrayTilesets, 0, 0);
         const layerCenarioDeFundo = map.createLayer('CenarioDeFundo', arrayTilesets, 0, 0);
-        const layerLimites = map.createLayer('Limites', arrayTilesets, 0, 0);
+        const layerLimites = map.createLayer('Limites', arrayDeTilesets, 0, 0);
         const layerObjetos = map.createLayer('Objetos', arrayTilesets, 0, 0);
         const layerForeground = map.createLayer('Foreground', arrayTilesets, 0, 0);
 
@@ -104,6 +104,12 @@ export class Game extends Phaser.Scene {
         });
 
         this.anims.create({
+            key: 'run',
+            frames: this.anims.generateFrameNumbers('solar_correndo', { start: 1, end: 2 }), 
+            frameRate: 15,
+        });
+
+        this.anims.create({
             key: 'jump',
             frames: this.anims.generateFrameNumbers('solar_pulando', { start: 2, end: 2 }),
             frameRate: 100
@@ -124,6 +130,11 @@ export class Game extends Phaser.Scene {
         // ==========================================
         // 5. CONTROLES
         // ==========================================
+
+        this.input.gamepad.once('connected', function (pad) {
+            console.log('Controle conectado:', pad.id);
+        })
+
         this.cursors = this.input.keyboard.createCursorKeys();
         
         // Teclas temporárias para alternar personagens (1 e 2)
@@ -131,9 +142,9 @@ export class Game extends Phaser.Scene {
         this.tecla2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
     }
 
-    update() {
+update() {
         // ==========================================
-        // TROCA TEMPORÁRIA DE PERSONAGEM (TECLAS 1 E 2)
+        // 1. TROCA TEMPORÁRIA DE PERSONAGEM (TECLAS 1 E 2)
         // ==========================================
         if (Phaser.Input.Keyboard.JustDown(this.tecla1)) {
             this.jogadorAtual = this.solar;
@@ -141,37 +152,72 @@ export class Game extends Phaser.Scene {
         } else if (Phaser.Input.Keyboard.JustDown(this.tecla2)) {
             this.jogadorAtual = this.fornalha;
             this.cameras.main.startFollow(this.fornalha);
-            // Zera a velocidade do solar ao desselecionar para ele não continuar andando sozinho
             this.solar.setVelocityX(0);
             this.solar.anims.stop();
         }
 
-        // A partir daqui, toda a lógica do update se aplica dinamicamente ao `this.jogadorAtual`
         const activePlayer = this.jogadorAtual;
         if (!activePlayer || !activePlayer.body) return;
 
         const body = activePlayer.body;
-        const noChao = body.blocked.down || body.touching.down || body.onFloor();
-        const apertouPulo = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space);     
-        const isTouchingWall = body.blocked.left || body.blocked.right;
-        const isFalling = body.velocity.y > 0;
-        const tocandoParedeEsquerda = body.blocked.left;
-        const tocandoParedeDireita = body.blocked.right;
-        const estaNaParede = (tocandoParedeEsquerda || tocandoParedeDireita) && !noChao && isFalling;
-        
+
+        // ==========================================
+        // 2. DEFINIÇÃO DE TECLAS
+        // ==========================================
         this.apertouE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
         this.apertouW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
         this.apertouA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.apertouS = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
         this.apertouD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
         this.apertouP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
+        this.apertouShift = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
 
         // ==========================================
-        // 1. FÍSICA E MOVIMENTO (Apenas setVelocity)
+        // 3. INTENÇÕES DE MOVIMENTO UNIFICADAS (Teclado + Controle)
         // ==========================================
+        let indoEsquerda = this.cursors.left.isDown || this.apertouA.isDown;
+        let indoDireita = this.cursors.right.isDown || this.apertouD.isDown;
+        let tentouPular = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space) || this.apertouW.isDown;
         
-        // Pulo
-        if ((apertouPulo && noChao) || (this.apertouW.isDown && noChao)) {
+        // Verifica se está a segurar SHIFT
+        let estaCorrendo = this.apertouShift.isDown;
+
+        const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+        if (pad) {
+            const axisX = pad.leftStick.x;
+            if (axisX < -0.2) indoEsquerda = true;
+            if (axisX > 0.2) indoDireita = true;
+            
+            if (pad.A || (pad.buttons.length > 0 && pad.buttons[0].pressed)) {
+                tentouPular = true;
+            }
+
+            // O gatilho RT no Phaser é geralmente o R2 ou o botão de índice 7
+            // Verificamos se o valor da pressão é maior que 10% para evitar toques acidentais
+            if (pad.R2 > 0.1 || (pad.buttons.length > 7 && pad.buttons[7].value > 0.1)) {
+                estaCorrendo = true;
+            }
+        }
+
+        // ==========================================
+        // 4. ESTADOS DA FÍSICA (Mantém o que você já tem)
+        // ==========================================
+        const noChao = body.blocked.down || body.touching.down || body.onFloor();
+        const isTouchingWall = body.blocked.left || body.blocked.right;
+        const isFalling = body.velocity.y > 0;
+        const estaNaParede = isTouchingWall && !noChao && isFalling;
+
+        // ==========================================
+        // 5. APLICAÇÃO DA FÍSICA E MOVIMENTO (Com Corrida)
+        // ==========================================
+        let executouWallJump = false;
+
+        // Calcula a velocidade baseado em estar a correr ou não
+        const velocidadeX = estaCorrendo ? 260 : 160; 
+        const impulsoParedeX = estaCorrendo ? 320 : 220; // Pula mais longe da parede se estiver a correr
+
+        // Pulo Normal
+        if (tentouPular && noChao) {
             activePlayer.setVelocityY(-400); 
         }
 
@@ -179,41 +225,43 @@ export class Game extends Phaser.Scene {
         if (estaNaParede) {
             activePlayer.setVelocityY(50); 
         }
-        
-        if ((apertouPulo && estaNaParede) || (this.apertouW.isDown && estaNaParede)) {
-            if (this.cursors.right.isDown || this.apertouD.isDown) {
-                activePlayer.setVelocityX(220);   
+
+        // Pulo na Parede (Wall Jump)
+        if (tentouPular && estaNaParede) {
+            executouWallJump = true;
+            if (indoDireita) { 
+                activePlayer.setVelocityX(impulsoParedeX);   
                 activePlayer.setVelocityY(-380);  
             }
-            else if (this.cursors.left.isDown || this.apertouA.isDown) {
-                activePlayer.setVelocityX(-220);  
+            else if (indoEsquerda) { 
+                activePlayer.setVelocityX(-impulsoParedeX);  
                 activePlayer.setVelocityY(-380);  
             }
         }
 
-        // Movimento Horizontal
-        if (!this.timeWarp) {
-            if (this.cursors.left.isDown || this.apertouA.isDown) {
-                activePlayer.setVelocityX(-160);
+        // Movimento Horizontal Normal
+        if (!executouWallJump) {
+            if (indoEsquerda) {
+                activePlayer.setVelocityX(-velocidadeX);
                 activePlayer.setFlipX(true);
             } 
-            else if (this.cursors.right.isDown || this.apertouD.isDown) {
-                activePlayer.setVelocityX(160);
+            else if (indoDireita) {
+                activePlayer.setVelocityX(velocidadeX);
                 activePlayer.setFlipX(false);
             } 
             else {
-                activePlayer.setVelocityX(0);
+                activePlayer.setVelocityX(0); 
             }
         }
 
         // ==========================================
-        // 2. GERENCIADOR DE ANIMAÇÕES (Apenas para o Solar por enquanto)
+        // 6. GERENCIADOR DE ANIMAÇÕES
         // ==========================================
         if (activePlayer === this.solar) {
             if (isTouchingWall && !noChao && isFalling) {
                 activePlayer.anims.play('wallSlide', true);
             } 
-            else if (!noChao) {
+            else if (!noChao && Math.abs(body.velocity.y) > 15) {
                 if (body.velocity.y < 0) {
                     activePlayer.anims.play('jump', true);
                 } else {
@@ -221,7 +269,11 @@ export class Game extends Phaser.Scene {
                 }
             } 
             else if (body.velocity.x !== 0) {
-                activePlayer.anims.play('walk', true);
+                if (estaCorrendo) {
+                    activePlayer.anims.play('run', true);
+                } else {
+                    activePlayer.anims.play('walk', true);
+                }
             } 
             else {
                 activePlayer.anims.stop();
@@ -229,6 +281,9 @@ export class Game extends Phaser.Scene {
             }
         }
 
+        // ==========================================
+        // 7. LÓGICA DA ESCURIDÃO
+        // ==========================================
         if (this.escuridaoSprite && activePlayer) {
             this.escuridaoSprite.setPosition(activePlayer.x, activePlayer.y);
         }
