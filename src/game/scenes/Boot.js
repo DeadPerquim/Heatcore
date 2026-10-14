@@ -6,6 +6,8 @@ export class Boot extends Scene {
   }
 
   preload() {
+    this.load.audio('boot_pc', 'assets/audio/sfx/Old_90s_PC_boot_sequence.wav');
+
     let bgGraphics = this.make.graphics({ add: false });
     bgGraphics.fillStyle(0x2a2a35, 1);
     bgGraphics.fillRect(0, 0, 800, 600);
@@ -18,127 +20,176 @@ export class Boot extends Scene {
   }
 
   create() {
-    // 1. FUNDO PRETO
+    // 1. FUNDO PRETO TIPO MONITOR ANTIGO
     this.add.rectangle(0, 0, 800, 600, 0x000000).setOrigin(0, 0);
     this.jaFoiProMenu = false;
+    this.sistemaIniciado = false;
 
     // ==========================================
-    // 2. EFEITOS DE MONITOR CRT / VHS
+    // 2. TELA DE ESPERA (DESBLOQUEIO DE ÁUDIO)
     // ==========================================
+    let avisoTexto = this.add.text(400, 300, "> PRESSIONE QUALQUER TECLA, CLIQUE OU BOTÃO PARA LIGAR <", {
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: 14,
+      color: "#00ff00",
+      align: "center"
+    }).setOrigin(0.5);
 
-    // Gerador de Scanlines (Linhas horizontais escuras)
+    this.tweens.add({
+      targets: avisoTexto,
+      alpha: 0.2,
+      duration: 500,
+      yoyo: true,
+      repeat: -1
+    });
+
+    // Função central para iniciar o sistema
+    const iniciarSistema = () => {
+      if (this.sistemaIniciado) return;
+      this.sistemaIniciado = true;
+
+      avisoTexto.destroy();
+
+      if (this.cache.audio.exists('boot_pc')) {
+          this.sound.play('boot_pc', { volume: 0.7 });
+      }
+
+      this.iniciarBios();
+    };
+
+    // Ouvintes para Rato e Teclado
+    this.input.once("pointerdown", iniciarSistema);
+    this.input.keyboard.once("keydown", iniciarSistema);
+
+    // Guardamos a função num apontador da cena para ser chamada pelo Gamepad no update()
+    this.iniciarSistemaCallback = iniciarSistema;
+  }
+
+  update() {
+    // Se o sistema ainda não arrancou, verificamos se algum botão do Gamepad foi pressionado
+    if (!this.sistemaIniciado) {
+        const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+        if (pad) {
+            // Percorre todos os botões do comando para ver se algum está a ser premido
+            const botaoPressionado = pad.buttons.some(button => button.pressed);
+            
+            // Ou se o analógico foi mexido significativamente
+            const analogicoMovido = Math.abs(pad.leftStick.x) > 0.3 || Math.abs(pad.leftStick.y) > 0.3;
+
+            if (botaoPressionado || analogicoMovido) {
+                this.iniciarSistemaCallback();
+            }
+        }
+        return; // Sai do update para não executar o resto enquanto estiver na tela de espera
+    }
+
+    // Lógica normal de pular a BIOS caso já tenha iniciado
+    const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+    if (pad && !this.jaFoiProMenu) {
+        if (pad.A || (pad.buttons.length > 9 && pad.buttons[9].pressed)) {
+            this.irParaPreloader();
+        }
+    }
+  }
+
+  iniciarBios() {
     let linhasTV = this.make.graphics({ add: false });
-    linhasTV.fillStyle(0x000000, 0.4); // Preto com 40% de opacidade
+    linhasTV.fillStyle(0x000000, 0.4); 
     for (let i = 0; i < 600; i += 4) {
         linhasTV.fillRect(0, i, 800, 2);
     }
     linhasTV.generateTexture('scanlines', 800, 600);
-
-    // ==========================================
-    // 3. TEXTO COM BRILHO NEON (GLOW)
-    // ==========================================
-    const linhasDoTerminal = [
-      "Iniciando HEATCORE OS v1.0.4...",
-      "Carregando modulos de memoria......... [OK]",
-      "Conectando ao servidor central........ [OK]",
-      "Verificando arquivos do Tiled (JSON).. [OK]",
-      "Injetando matrizes de colisao física.. [OK]",
-      "Despertando entidades: Solar.......... [OK]",
-      "Despertando entidades: Fornalha....... [OK]",
-      "Compilando renderizador 2D............ [OK]",
-      "Acesso concedido. Abrindo interface."
-    ];
-
-    let consoleText = this.add.text(40, 40, "", {
-      fontFamily: "'Courier New', Courier, monospace", 
-      fontSize: 18,
-      color: "#66ff66", // Verde mais claro no centro
-      align: "left",
-      // O truque do brilho do monitor antigo:
-      shadow: { offsetX: 0, offsetY: 0, color: '#00ff00', blur: 6, fill: true } 
-    });
-
-    // ==========================================
-    // 4. APLICANDO AS CAMADAS VISUAIS (OVERLAYS)
-    // ==========================================
-    // Coloca as scanlines por cima de tudo (Depth 10)
     this.add.image(0, 0, 'scanlines').setOrigin(0, 0).setDepth(10);
 
-    // Efeito Flicker (Tela piscando sutilmente)
-    let crtFlicker = this.add.rectangle(0, 0, 800, 600, 0x00ff00, 0.02).setOrigin(0, 0).setDepth(11);
+    let crtFlicker = this.add.rectangle(0, 0, 800, 600, 0x00ff00, 0.015).setOrigin(0, 0).setDepth(11);
     this.tweens.add({
         targets: crtFlicker,
-        alpha: 0.05,
+        alpha: 0.04,
         duration: 70,
         yoyo: true,
         repeat: -1
     });
 
-    // Efeito de falha VHS (Micro tremidas horizontais aleatórias)
+    const linhasDoTerminal = [
+      "Award Modular BIOS v4.51PG, An Energy Star Ally",
+      "Copyright (C) 1984-97, Award Software, Inc.",
+      "",
+      "PENTIUM-S CPU at 75MHz (Overclocked to 3200MHz)",
+      "Memory Test :  65536K OK",
+      "",
+      "Award Plug and Play BIOS Extension v1.0A",
+      "Detecting IDE Primary Master  ... Heatcore_SSD [OK]",
+      "Detecting IDE Primary Slave   ... [None]",
+      "Detecting IDE Secondary Master... Solar_Mod.iso [OK]",
+      "Detecting IDE Secondary Slave ... Fornalha_Engine.pak [OK]",
+      "",
+      "Initializing USB Controllers... [OK]",
+      "Verifying DMI Pool Data....................... SUCCESS",
+      "Allocating DMA channels for Audio Mixer....... [OK]",
+      "Mounting Tiled JSON Maps & Spritesheets....... [OK]",
+      "",
+      "Press DEL to enter SETUP",
+      "12/10/2026-i430VX-UMC8669-2A59GH2BC-00",
+      "",
+      "SYSTEM BOOT SUCCESSFUL. LOADING INTERFACE..."
+    ];
+
+    let consoleText = this.add.text(40, 30, "", {
+      fontFamily: "'Courier New', Courier, monospace", 
+      fontSize: 15,
+      color: "#00ff00", 
+      align: "left",
+      shadow: { offsetX: 0, offsetY: 0, color: '#00ff00', blur: 4, fill: true } 
+    });
+
     this.time.addEvent({
-        delay: 1200,
+        delay: 1500,
         loop: true,
         callback: () => {
             if (Math.random() > 0.6 && !this.jaFoiProMenu) {
-                consoleText.x = 43; // Dá um "pulo" para o lado
-                this.time.delayedCall(60, () => { consoleText.x = 40; }); // Volta na mesma hora
+                consoleText.x = 43; 
+                this.time.delayedCall(50, () => { consoleText.x = 40; }); 
             }
         }
     });
 
-    // ==========================================
-    // 5. LÓGICA DE DIGITAÇÃO DO TERMINAL
-    // ==========================================
     let linhaAtual = 0;
     let textoAcumulado = "";
 
     this.time.addEvent({
-      delay: 250, 
+      delay: 120, 
       repeat: linhasDoTerminal.length - 1,
       callback: () => {
         if (this.jaFoiProMenu) return; 
 
         textoAcumulado += linhasDoTerminal[linhaAtual] + "\n";
-        consoleText.setText(textoAcumulado);
+        consoleText.setText(textoAcumulado + "_");
         linhaAtual++;
 
         if (linhaAtual === linhasDoTerminal.length) {
-          this.time.delayedCall(500, () => {
-            this.irParaMenu();
+          this.time.delayedCall(900, () => {
+            this.irParaPreloader();
           });
         }
       }
     });
 
-    // Sistema de Pular (Skip)
-    this.input.once("pointerdown", () => this.irParaMenu());
-    this.input.keyboard.once("keydown-ENTER", () => this.irParaMenu());
+    this.input.once("pointerdown", () => this.irParaPreloader());
+    this.input.keyboard.once("keydown-ENTER", () => this.irParaPreloader());
   }
 
-  update() {
-    const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
-    if (pad && !this.jaFoiProMenu) {
-        if (pad.A || (pad.buttons.length > 9 && pad.buttons[9].pressed)) {
-            this.irParaMenu();
-        }
-    }
-  }
-
-  irParaMenu() {
+  irParaPreloader() {
     if (this.jaFoiProMenu) return;
     this.jaFoiProMenu = true;
 
-    this.scene.launch("MainMenu");
-    this.scene.bringToTop("Boot");
+    try {
+        this.sound.stopByKey('boot_pc');
+    } catch (e) {}
 
-    this.tweens.add({
-        targets: this.cameras.main,
-        alpha: 0, 
-        duration: 1500, 
-        ease: 'Power2',
-        onComplete: () => {
-            this.scene.stop("Boot");
-        }
+    this.cameras.main.fadeOut(800, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+        this.scene.stop("Boot");
+        this.scene.start("Preloader");
     });
   }
 }

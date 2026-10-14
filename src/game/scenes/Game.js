@@ -22,7 +22,7 @@ export class Game extends Phaser.Scene {
         // Cria as camadas informando o array com todos os tilesets
         const layerPedras = map.createLayer('Pedras', arrayTilesets, 0, 0);
         const layerCenarioDeFundo = map.createLayer('CenarioDeFundo', arrayTilesets, 0, 0);
-        const layerLimites = map.createLayer('Limites', arrayDeTilesets, 0, 0);
+        const layerLimites = map.createLayer('Limites', arrayTilesets, 0, 0);
         const layerObjetos = map.createLayer('Objetos', arrayTilesets, 0, 0);
         const layerForeground = map.createLayer('Foreground', arrayTilesets, 0, 0);
 
