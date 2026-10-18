@@ -99,7 +99,7 @@ export class MainMenu extends Scene {
     let baseMenuX = width * 0.95; 
     
     this.menuOptions = [
-      { text: "JOGAR", action: () => this.abrirSelecaoPersonagem("Game") },
+      { text: "JOGAR", action: () => this.abrirSelecaoPersonagem("Mapa2") },
       { text: "MAPA DIÁRIO", action: () => this.abrirSelecaoPersonagem("Diario") },
       { text: "OPÇÕES", action: () => console.log("Opções selecionadas") },
       { text: "CRÉDITOS", action: () => console.log("Créditos selecionados") }

@@ -50,6 +50,11 @@ export class Mapa2 extends Scene {
         const layerObjetos = map.createLayer('Objetos', arrayTilesets, 0, 0);
         const layerForeground = map.createLayer('Foreground', arrayTilesets, 0, 0);
 
+        if (this.cache.audio.has('som_queda')) {
+            this.somQueda = this.sound.add('som_queda');
+        }
+
+
         layerLimites.setCollisionByExclusion([-1]);
         layerObjetos.setCollisionByExclusion([-1]);
         
@@ -81,8 +86,8 @@ export class Mapa2 extends Scene {
         // 2. SPAWN DO PERSONAGEM LOCAL E REMOTO (SEPARADOS E SEGUROS)
         // ==========================================
         const posicoesSpawn = {
-            solar: { x: 247.5, y: 520 },
-            fornalha: { x: 680, y: 300 }
+            solar: { x: 247.5, y: 370 },
+            fornalha: { x: 800, y: 370 }
         };
 
         const coordLocal = posicoesSpawn[this.personagemInicial];
@@ -164,6 +169,39 @@ export class Mapa2 extends Scene {
 
     update() {
         if (this.jaEstaSaindo) return;
+
+        const limiteQueda = this.mapaAlturaTotal;
+        
+        if (this.jogadorAtual && this.jogadorAtual.y > limiteQueda && !this.jogadorAtual.estaRenascendo) {
+            this.jogadorAtual.estaRenascendo = true;
+
+            if (this.somQueda) {
+                this.somQueda.stop();
+                this.somQueda.play();
+            } else if (this.cache.audio.has('caindo')) {
+                this.sound.play('caindo');
+            }
+
+            this.cameras.main.stopFollow();
+            this.jogadorAtual.setVisible(false);
+            if (this.jogadorAtual.body) this.jogadorAtual.body.setEnable(false);
+
+            this.time.delayedCall(1500, () => {
+                if (this.somQueda) this.somQueda.stop();
+                if (this.cache.audio.has('caindo')) {
+                    this.sound.stopByKey('caindo');
+                    this.sound.getAll('caindo').forEach(s => s.stop());
+                }
+
+                this.jogadorAtual.setPosition(this.jogadorAtual.spawnX, this.jogadorAtual.spawnY);
+                this.jogadorAtual.setVelocity(0, 0);
+                this.jogadorAtual.setVisible(true);
+                if (this.jogadorAtual.body) this.jogadorAtual.body.setEnable(true);
+                this.jogadorAtual.estaRenascendo = false;
+
+                this.cameras.main.startFollow(this.jogadorAtual);
+            });
+        }
 
         const activePlayer = this.jogadorAtual;
         if (!activePlayer || !activePlayer.body) return;
