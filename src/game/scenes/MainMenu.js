@@ -48,7 +48,7 @@ export class MainMenu extends Scene {
     });
 
     // ==========================================
-    // 1. FUNDO DE LABORATÓRIO (COM VERIFICAÇÃO ANTI-CRASH)
+    // 1. FUNDO DE LABORATÓRIO
     // ==========================================
     if (!this.textures.exists('fundo_lab_pro')) {
       const bgCanvas = this.textures.createCanvas('fundo_lab_pro', width, height);
@@ -132,7 +132,7 @@ export class MainMenu extends Scene {
     }
 
     // ==========================================
-    // 2. HUD INDUSTRIAL DE LABORATÓRIO
+    // 2. HUD INDUSTRIAL
     // ==========================================
     const corHud = "#00f3ff";
     this.add.text(30, 25, "SYS_STATUS // ONLINE", {
@@ -143,7 +143,7 @@ export class MainMenu extends Scene {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
     }).setAlpha(0.5);
 
-    this.add.text(width - 30, height - 30, "HEATCORE v1.0.5 - MAPA2, OPÇÕES, CRÉDITOS", {
+    this.add.text(width - 30, height - 30, "HEATCORE v1.1.0 - MODOS DIÁRIOS", {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
     }).setOrigin(1, 1).setAlpha(0.5);
 
@@ -175,21 +175,23 @@ export class MainMenu extends Scene {
     });
 
     // ==========================================
-    // 4. SISTEMA DE MENU PRINCIPAL
+    // 4. MENU PRINCIPAL & SUBMENU DIÁRIO
     // ==========================================
     this.baseMenuX = width * 0.92; 
     this.startY = height * 0.315; 
 
+    this.modoDiarioSelecionado = "PLATAFORMAS";
+
     this.menuOptions = [
-      { text: "JOGAR", action: () => this.abrirSelecaoPersonagem("Mapa2") },
-      { text: "MAPA DIÁRIO", action: () => this.abrirSelecaoPersonagem("Diario") },
+      { text: "JOGAR", action: () => this.abrirSelecaoPersonagem("Game") },
+      { text: "MAPAS DIÁRIOS", action: () => this.abrirSubmenuDiario() },
       { text: "OPÇÕES", action: () => this.abrirOpcoes() },
       { text: "CRÉDITOS", action: () => this.irParaCreditos() }
     ];
 
     this.selectedIndex = 0; 
     this.btnObjects = [];
-    this.estadoMenu = "MAIN";
+    this.estadoMenu = "MAIN"; // MAIN | SUBMENU_DIARIO | OPTIONS
 
     this.btnHighlightBg = this.add.rectangle(this.baseMenuX + 20, this.startY, 310, 48, 0xff9900, 0.15)
         .setOrigin(1, 0.5)
@@ -256,22 +258,145 @@ export class MainMenu extends Scene {
     this.overlayAtivo = false;
     this.inputCooldown = 0; 
 
+    this.criarSubmenuDiario();
     this.criarMenuOpcoes();
     this.criarOverlayPersonagens();
     this.atualizarSelecaoVisual();
 
-    // Eventos do Navegador/Phaser para atualizar estado de Tela Cheia
     this.scale.on('fullscreenchange', () => {
-      if (this.toggleFullscreen) {
-        this.toggleFullscreen.atualizarVisual();
-      }
+      if (this.toggleFullscreen) this.toggleFullscreen.atualizarVisual();
     });
 
     document.addEventListener('fullscreenchange', () => {
-      if (this.toggleFullscreen) {
-        this.toggleFullscreen.atualizarVisual();
+      if (this.toggleFullscreen) this.toggleFullscreen.atualizarVisual();
+    });
+  }
+
+  // ==========================================
+  // CONSTRUÇÃO DO SUBMENU DE MAPAS DIÁRIOS
+  // ==========================================
+  criarSubmenuDiario() {
+    const posX = this.baseMenuX + 350; 
+
+    this.containerSubmenuDiario = this.add.container(posX, this.startY - 10).setAlpha(0);
+
+    const tituloDiario = this.add.text(0, -10, "// ESCOLHA O DESAFIO DIÁRIO", {
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: 18,
+      color: "#00f3ff",
+      fontStyle: "bold"
+    }).setOrigin(1, 0.5);
+
+    this.opcoesModosDiarios = [
+      { id: "PLATAFORMAS", label: "PLATAFORMAS" },
+      { id: "LABIRINTO",   label: "LABIRINTO" },
+      { id: "VOLTAR",      label: "> [ VOLTAR ] <" }
+    ];
+
+    this.btnObjetosDiario = [];
+    this.diarioIndex = 0;
+
+    this.opcoesModosDiarios.forEach((item, index) => {
+      let btnTxt = this.add.text(0, 45 + (index * 60), item.label, {
+        fontFamily: "'Courier New', Courier, monospace",
+        fontSize: 22,
+        color: index === 0 ? "#ff9900" : "#666677",
+        fontStyle: "bold",
+        stroke: "#000000",
+        strokeThickness: 3
+      }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
+
+      btnTxt.on('pointerover', () => {
+        if (this.estadoMenu === "SUBMENU_DIARIO") {
+          this.diarioIndex = index;
+          this.atualizarSelecaoDiario();
+        }
+      });
+
+      btnTxt.on('pointerdown', () => {
+        if (this.estadoMenu === "SUBMENU_DIARIO") {
+          this.confirmarOpcaoDiario();
+        }
+      });
+
+      this.btnObjetosDiario.push(btnTxt);
+    });
+
+    this.containerSubmenuDiario.add([tituloDiario, ...this.btnObjetosDiario]);
+  }
+
+  abrirSubmenuDiario() {
+    if (this.estadoMenu === "SUBMENU_DIARIO") return;
+    this.estadoMenu = "SUBMENU_DIARIO";
+    this.inputCooldown = 250;
+    this.diarioIndex = 0;
+    this.atualizarSelecaoDiario();
+
+    this.tweens.add({ targets: this.btnHighlightBg, alpha: 0, duration: 150 });
+
+    this.tweens.add({
+      targets: this.containerBotoesMenu,
+      x: 350,
+      alpha: 0,
+      duration: 350,
+      ease: 'Back.easeIn'
+    });
+
+    this.tweens.add({
+      targets: this.containerSubmenuDiario,
+      x: this.baseMenuX,
+      alpha: 1,
+      duration: 400,
+      delay: 150,
+      ease: 'Back.easeOut'
+    });
+  }
+
+  fecharSubmenuDiario() {
+    if (this.estadoMenu === "MAIN") return;
+    this.estadoMenu = "MAIN";
+    this.inputCooldown = 250;
+
+    this.tweens.add({
+      targets: this.containerSubmenuDiario,
+      x: this.baseMenuX + 350,
+      alpha: 0,
+      duration: 300,
+      ease: 'Back.easeIn'
+    });
+
+    this.tweens.add({
+      targets: this.containerBotoesMenu,
+      x: 0,
+      alpha: 1,
+      duration: 400,
+      delay: 100,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.atualizarSelecaoVisual();
       }
     });
+  }
+
+  atualizarSelecaoDiario() {
+    this.btnObjetosDiario.forEach((btn, index) => {
+      const isSelected = index === this.diarioIndex;
+      if (isSelected) {
+        btn.setColor("#ff9900");
+      } else {
+        btn.setColor(index === 2 ? "#ff4444" : "#666677");
+      }
+    });
+  }
+
+  confirmarOpcaoDiario() {
+    const opcao = this.opcoesModosDiarios[this.diarioIndex];
+    if (opcao.id === "VOLTAR") {
+      this.fecharSubmenuDiario();
+    } else {
+      this.modoDiarioSelecionado = opcao.id;
+      this.abrirSelecaoPersonagem("Diario");
+    }
   }
 
   irParaCreditos() {
@@ -285,7 +410,7 @@ export class MainMenu extends Scene {
   }
 
   // ==========================================
-  // LÓGICA E CONSTRUÇÃO DO MENU DE OPÇÕES
+  // MENU DE OPÇÕES
   // ==========================================
   criarMenuOpcoes() {
     const posX = this.baseMenuX + 350; 
@@ -299,23 +424,19 @@ export class MainMenu extends Scene {
       fontStyle: "bold"
     }).setOrigin(1, 0.5);
 
-    // SLIDER 1: MÚSICA
     this.sliderMusica = this.criarSliderAudio(0, 55, "MÚSICA", this.game.volumeMusica, (val) => {
       this.game.volumeMusica = val;
       if (this.musicaMenu) this.musicaMenu.setVolume(val);
     });
 
-    // SLIDER 2: EFEITOS SONOROS
     this.sliderSFX = this.criarSliderAudio(0, 125, "EFEITOS SONOROS", this.game.volumeSFX, (val) => {
       this.game.volumeSFX = val;
     });
 
-    // OPÇÃO 3: TELA CHEIA (FULLSCREEN TOGGLE)
     this.toggleFullscreen = this.criarToggleFullscreen(0, 195, "TELA CHEIA", () => {
       this.alternarTelaCheia();
     });
 
-    // BOTÃO VOLTAR
     this.btnVoltarOpcoes = this.add.text(0, 265, "> [ VOLTAR ] <", {
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 24,
@@ -342,7 +463,7 @@ export class MainMenu extends Scene {
       this.btnVoltarOpcoes
     ]);
 
-    this.opcoesIndex = 0; // 0: Música, 1: SFX, 2: Tela Cheia, 3: Voltar
+    this.opcoesIndex = 0;
   }
 
   criarSliderAudio(x, y, rotulo, valorInicial, onChange) {
@@ -503,7 +624,6 @@ export class MainMenu extends Scene {
   }
 
   atualizarSelecaoOpcoes() {
-    // 0: Música, 1: SFX, 2: Tela Cheia, 3: Voltar
     this.sliderMusica.textoRotulo.setColor(this.opcoesIndex === 0 ? "#ff9900" : "#ffffff");
     this.sliderSFX.textoRotulo.setColor(this.opcoesIndex === 1 ? "#ff9900" : "#ffffff");
     this.toggleFullscreen.textoRotulo.setColor(this.opcoesIndex === 2 ? "#ff9900" : "#ffffff");
@@ -665,7 +785,7 @@ export class MainMenu extends Scene {
     cantoneiras.moveTo(-90, -75); cantoneiras.lineTo(-90, -90); cantoneiras.lineTo(-75, -90);
     cantoneiras.moveTo(75, -90); cantoneiras.lineTo(90, -90); cantoneiras.lineTo(90, -75);
     cantoneiras.moveTo(-90, 75); cantoneiras.lineTo(-90, 90); cantoneiras.lineTo(-75, 90);
-    cantoneiras.moveTo(75, 90); cantoneiras.lineTo(90, 90); cantoneiras.lineTo(90, 75);
+    cantoneiras.moveTo(75, 90); cantoneiras.lineTo(90, 90); cantoneiras.lineTo(75, 90);
     cantoneiras.strokePath();
 
     let spritePreview;
@@ -849,6 +969,7 @@ export class MainMenu extends Scene {
           this.scene.stop();
           this.scene.start(this.cenaDestino, {
             personagem: personagemEscolhido,
+            modoDiario: this.modoDiarioSelecionado,
             pontosSolar: 0,
             pontosFornalha: 0,
             offsetDias: 0
@@ -910,6 +1031,53 @@ export class MainMenu extends Scene {
         this.fecharOverlay();
       }
 
+      return;
+    }
+
+    if (this.estadoMenu === "SUBMENU_DIARIO") {
+      let cancelar = Phaser.Input.Keyboard.JustDown(this.keyEsc);
+
+      if (pad) {
+        if (pad.B || (pad.buttons.length > 1 && pad.buttons[1].pressed) || (pad.buttons.length > 8 && pad.buttons[8].pressed)) {
+          cancelar = true;
+        }
+      }
+
+      if (cancelar) {
+        this.fecharSubmenuDiario();
+        return;
+      }
+
+      if (this.inputCooldown <= 0) {
+        let moverCima = Phaser.Input.Keyboard.JustDown(this.keyUp) || Phaser.Input.Keyboard.JustDown(this.keyW);
+        let moverBaixo = Phaser.Input.Keyboard.JustDown(this.keyDown) || Phaser.Input.Keyboard.JustDown(this.keyS);
+        let confirmar = Phaser.Input.Keyboard.JustDown(this.keyEnter);
+
+        if (pad) {
+          const axisY = pad.leftStick.y;
+          if (axisY < -0.5 || pad.up) { moverCima = true; this.inputCooldown = 200; } 
+          else if (axisY > 0.5 || pad.down) { moverBaixo = true; this.inputCooldown = 200; }
+          if (pad.A || (pad.buttons.length > 0 && pad.buttons[0].pressed) || (pad.buttons.length > 9 && pad.buttons[9].pressed)) {
+            confirmar = true;
+          }
+        }
+
+        if (moverCima) {
+          this.diarioIndex--;
+          if (this.diarioIndex < 0) this.diarioIndex = this.opcoesModosDiarios.length - 1;
+          this.atualizarSelecaoDiario();
+          this.inputCooldown = 180;
+        } else if (moverBaixo) {
+          this.diarioIndex++;
+          if (this.diarioIndex >= this.opcoesModosDiarios.length) this.diarioIndex = 0;
+          this.atualizarSelecaoDiario();
+          this.inputCooldown = 180;
+        }
+
+        if (confirmar) {
+          this.confirmarOpcaoDiario();
+        }
+      }
       return;
     }
 

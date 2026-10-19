@@ -8,6 +8,7 @@ export class Diario extends Scene {
     init(data) {
         this.offsetDias = data ? (data.offsetDias || 0) : 0;
         this.personagemInicial = data ? (data.personagem || 'solar') : 'solar';
+        this.modoDiario = data ? (data.modoDiario || 'PLATAFORMAS') : 'PLATAFORMAS'; // PLATAFORMAS | LABIRINTO
     }
 
     create() {
@@ -19,21 +20,29 @@ export class Diario extends Scene {
         this.socket = this.game.socket;
         this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
 
-        console.log(`🎮 [DIARIO] Entrou na cena como: ${this.personagemInicial}. O outro é: ${this.outroPersonagemTipo}`);
-
-        // Escuta se o outro jogador completou a fase para expulsar este também
         if (this.socket) {
             this.socket.off('voltarAoMenuGeral'); 
             this.socket.on('voltarAoMenuGeral', () => {
-                console.log(`🏆 [DIARIO] Recebido aviso de conclusão de fase. Voltando ao menu...`);
                 this.voltarParaMenu();
             });
         }
 
-        // Semente oficial unificada
+        // ==========================================
+        // SEMENTE ÚNICA SINCRONIZADA POR DIA + MODO
+        // ==========================================
         const dataSimulada = new Date();
         dataSimulada.setDate(dataSimulada.getDate() + this.offsetDias);
-        let currentSeed = (dataSimulada.getUTCFullYear() * 10000) + ((dataSimulada.getUTCMonth() + 1) * 100) + dataSimulada.getUTCDate() + this.offsetDias;
+        
+        let hashModo = 0;
+        for (let i = 0; i < this.modoDiario.length; i++) {
+            hashModo += this.modoDiario.charCodeAt(i);
+        }
+
+        let currentSeed = (dataSimulada.getUTCFullYear() * 10000) + 
+                           ((dataSimulada.getUTCMonth() + 1) * 100) + 
+                           dataSimulada.getUTCDate() + 
+                           this.offsetDias + 
+                           (hashModo * 777);
 
         const randomDiario = () => {
             let t = currentSeed += 0x6D2B79F5;
@@ -43,7 +52,7 @@ export class Diario extends Scene {
         };
 
         // ==========================================
-        // 1. CARREGAMENTO DOS TILESETS E ÁUDIO
+        // 1. TILESETS E CAMADAS
         // ==========================================
         const map = this.make.tilemap({ key: 'mapa' });
 
@@ -66,76 +75,133 @@ export class Diario extends Scene {
             this.somQueda = this.sound.add('som_queda');
         }
 
-        // ==========================================
-        // ⚙️ TEMA DIÁRIO DOS BLOCOS DE AR
-        // ==========================================
+        // Estilo e Textura dos blocos
         const BASE_TEXTURAS1 = 3;
         const ID_BLOCO_BRANCO = BASE_TEXTURAS1 + 17;
         const ID_BLOCO_PRETO  = BASE_TEXTURAS1 + 38;
 
         const COR_MAPA_HOJE = randomDiario() > 0.5 ? ID_BLOCO_BRANCO : ID_BLOCO_PRETO;
 
-        // ==========================================
-        // 1.2 LIMPEZA E RECONSTRUÇÃO PROCEDURAL
-        // ==========================================
         const larg = map.width;
         const alt = map.height;
 
+        // Limpeza total do mapa
         for (let x = 0; x < larg; x++) {
             for (let y = 0; y < alt; y++) {
                 layerLimites.removeTileAt(x, y);
                 layerObjetos.removeTileAt(x, y);
                 layerPedras?.removeTileAt(x, y);
-                
-                if (x === 0 || x === larg - 1 || y === 0) {
+            }
+        }
+
+        let ySolar = 15;
+        let yFornalha = 15;
+
+        // ==========================================
+        // 2. MOTORES DE GERAÇÃO PROCEDURAL
+        // ==========================================
+
+        if (this.modoDiario === 'PLATAFORMAS') {
+            for (let x = 0; x < larg; x++) {
+                for (let y = 0; y < alt; y++) {
+                    if (x === 0 || x === larg - 1 || y === 0) {
+                        layerLimites.putTileAt(COR_MAPA_HOJE, x, y);
+                    }
+                }
+            }
+
+            ySolar = Math.floor(randomDiario() * (alt - 20)) + 10;
+            yFornalha = Math.floor(randomDiario() * (alt - 20)) + 10;
+
+            // Corredor Solar
+            for (let x = 1; x <= 10; x++) {
+                layerLimites.putTileAt(COR_MAPA_HOJE, x, ySolar); 
+                layerLimites.putTileAt(COR_MAPA_HOJE, x, ySolar - 6); 
+            }
+            for (let y = ySolar - 5; y < ySolar; y++) layerLimites.putTileAt(COR_MAPA_HOJE, 1, y);
+
+            // Corredor Fornalha
+            for (let x = larg - 11; x < larg - 1; x++) {
+                layerLimites.putTileAt(COR_MAPA_HOJE, x, yFornalha); 
+                layerLimites.putTileAt(COR_MAPA_HOJE, x, yFornalha - 6); 
+            }
+            for (let y = yFornalha - 5; y < yFornalha; y++) layerLimites.putTileAt(COR_MAPA_HOJE, larg - 2, y);
+
+            // Abismo e Plataformas Flutuantes
+            let startX = 12;
+            let endX = larg - 13;
+            let totalPassos = endX - startX;
+            
+            for (let x = startX; x <= endX; x += Math.floor(randomDiario() * 3) + 3) {
+                let progresso = (x - startX) / totalPassos;
+                let targetY = ySolar + Math.round((yFornalha - ySolar) * progresso);
+                let currentY = targetY + (Math.floor(randomDiario() * 7) - 3);
+
+                if (currentY < 5) currentY = 5;
+                if (currentY > alt - 5) currentY = alt - 5;
+
+                let larguraPlat = Math.floor(randomDiario() * 3) + 2;
+                for (let i = 0; i < larguraPlat; i++) {
+                    if (x + i <= endX) layerLimites.putTileAt(COR_MAPA_HOJE, x + i, currentY); 
+                }
+
+                if (randomDiario() > 0.5) {
+                    let pilarAltura = Math.floor(randomDiario() * 4) + 3;
+                    let pilarX = x + larguraPlat;
+                    if (pilarX <= endX - 2) { 
+                        for (let p = 0; p < pilarAltura; p++) {
+                            layerLimites.putTileAt(COR_MAPA_HOJE, pilarX, currentY - p);
+                        }
+                    }
+                }
+            }
+
+        } else if (this.modoDiario === 'LABIRINTO') {
+            for (let x = 0; x < larg; x++) {
+                for (let y = 0; y < alt; y++) {
                     layerLimites.putTileAt(COR_MAPA_HOJE, x, y);
                 }
             }
-        }
 
-        let ySolar = Math.floor(randomDiario() * (alt - 20)) + 10;
-        let yFornalha = Math.floor(randomDiario() * (alt - 20)) + 10;
+            ySolar = 6;
+            yFornalha = alt - 6;
 
-        // Corredor Solar
-        for (let x = 1; x <= 10; x++) {
-            layerLimites.putTileAt(COR_MAPA_HOJE, x, ySolar); 
-            layerLimites.putTileAt(COR_MAPA_HOJE, x, ySolar - 6); 
-        }
-        for (let y = ySolar - 5; y < ySolar; y++) layerLimites.putTileAt(COR_MAPA_HOJE, 1, y);
+            const passo = 4;
+            for (let x = 3; x < larg - 3; x += passo) {
+                for (let y = 3; y < alt - 3; y += passo) {
+                    for (let cx = 0; cx < 3; cx++) {
+                        for (let cy = 0; cy < 3; cy++) {
+                            layerLimites.removeTileAt(x + cx, y + cy);
+                        }
+                    }
 
-        // Corredor Fornalha
-        for (let x = larg - 11; x < larg - 1; x++) {
-            layerLimites.putTileAt(COR_MAPA_HOJE, x, yFornalha); 
-            layerLimites.putTileAt(COR_MAPA_HOJE, x, yFornalha - 6); 
-        }
-        for (let y = yFornalha - 5; y < yFornalha; y++) layerLimites.putTileAt(COR_MAPA_HOJE, larg - 2, y);
-
-        // Abismo e Plataformas Flutuantes
-        let startX = 12;
-        let endX = larg - 13;
-        let totalPassos = endX - startX;
-        
-        for (let x = startX; x <= endX; x += Math.floor(randomDiario() * 3) + 3) {
-            let progresso = (x - startX) / totalPassos;
-            let targetY = ySolar + Math.round((yFornalha - ySolar) * progresso);
-            let currentY = targetY + (Math.floor(randomDiario() * 7) - 3);
-
-            if (currentY < 5) currentY = 5;
-            if (currentY > alt - 5) currentY = alt - 5;
-
-            let larguraPlat = Math.floor(randomDiario() * 3) + 2;
-            for (let i = 0; i < larguraPlat; i++) {
-                if (x + i <= endX) layerLimites.putTileAt(COR_MAPA_HOJE, x + i, currentY); 
-            }
-
-            if (randomDiario() > 0.5) {
-                let pilarAltura = Math.floor(randomDiario() * 4) + 3;
-                let pilarX = x + larguraPlat;
-                if (pilarX <= endX - 2) { 
-                    for (let p = 0; p < pilarAltura; p++) {
-                        layerLimites.putTileAt(COR_MAPA_HOJE, pilarX, currentY - p);
+                    if (randomDiario() > 0.35 && x + passo < larg - 3) {
+                        for (let k = 0; k < passo; k++) {
+                            layerLimites.removeTileAt(x + k, y);
+                            layerLimites.removeTileAt(x + k, y + 1);
+                        }
+                    }
+                    if (randomDiario() > 0.35 && y + passo < alt - 3) {
+                        for (let k = 0; k < passo; k++) {
+                            layerLimites.removeTileAt(x, y + k);
+                            layerLimites.removeTileAt(x + 1, y + k);
+                        }
                     }
                 }
+            }
+
+            for (let x = 1; x <= 10; x++) {
+                for (let y = ySolar - 3; y <= ySolar + 1; y++) {
+                    layerLimites.removeTileAt(x, y);
+                }
+                layerLimites.putTileAt(COR_MAPA_HOJE, x, ySolar + 2);
+            }
+
+            for (let x = larg - 11; x < larg - 1; x++) {
+                for (let y = yFornalha - 3; y <= yFornalha + 1; y++) {
+                    layerLimites.removeTileAt(x, y);
+                }
+                layerLimites.putTileAt(COR_MAPA_HOJE, x, yFornalha + 2);
             }
         }
 
@@ -146,7 +212,7 @@ export class Diario extends Scene {
         this.physics.world.setBoundsCollision(true, true, true, false);
 
         // ==========================================
-        // 2. SPAWN DO PERSONAGEM LOCAL E REMOTO (SEPARADOS)
+        // 3. SPAWN DE PERSONAGENS & TELEPORTADORES
         // ==========================================
         const TW = map.tileWidth;
         const TH = map.tileHeight;
@@ -169,7 +235,7 @@ export class Diario extends Scene {
         const chaveSpriteOutro = this.outroPersonagemTipo === 'solar' ? 'solar_andando' : 'Fornalha';
 
         this.outroSprite = this.add.sprite(coordOutro.x, coordOutro.y, chaveSpriteOutro).setAlpha(0.9).setDepth(50);
-        this.outroSprite.setVisible(false); // Oculto até receber dados reais da rede
+        this.outroSprite.setVisible(false);
 
         if (this.socket) {
             this.socket.off('atualizarPosicoes');
@@ -191,32 +257,22 @@ export class Diario extends Scene {
         const teleporter2 = this.teleporters.create((larg - 4) * TW, (yFornalha - 1) * TH, 'corredorDireito').setVisible(false);
 
         // ==========================================
-        // INTERFACE DA MÁQUINA DO TEMPO (+ / -)
+        // INTERFACE DA MÁQUINA DO TEMPO & HUD DE MODO
         // ==========================================
         let stringData = dataSimulada.toLocaleDateString();
         let textoOffset = this.offsetDias === 0 ? "HOJE" : (this.offsetDias > 0 ? `+${this.offsetDias} DIA(S)` : `${this.offsetDias} DIA(S)`);
+        
+        let rotulosModos = {
+            'PLATAFORMAS': 'DESAFIO DE PLATAFORMAS',
+            'LABIRINTO':   'CORRIDA NO LABIRINTO'
+        };
 
-        this.add.text(40, 30, `MAPA DIÁRIO: ${textoOffset} (${stringData})`, {
+        this.add.text(40, 25, `MAPA DIÁRIO: ${textoOffset} (${stringData})`, {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 16, color: "#ff9900", stroke: "#000000", strokeThickness: 3
         }).setScrollFactor(0).setDepth(200);
-        this.add.text(40, 60, "[ ESC / SELECT: VOLTAR AO MENU ]", {
-            fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#ff9900", stroke: "#000000", strokeThickness: 3
-        }).setScrollFactor(0).setDepth(200);
-
-        if (this.textures.exists('escuridaoComFuroDiario')) this.textures.remove('escuridaoComFuroDiario');
-        const canvLarg = 2500, canvAlt = 2500, raioLuz = 24;   
-        const canvasTexture = this.textures.createCanvas('escuridaoComFuroDiario', canvLarg, canvAlt);
-        const ctx = canvasTexture.context;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-        ctx.fillRect(0, 0, canvLarg, canvAlt);
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.beginPath();
-        ctx.arc(canvLarg / 2, canvAlt / 2, raioLuz, 0, Math.PI * 2);
-        ctx.fill();
-        canvasTexture.refresh();
 
         // ==========================================
-        // 3. FÍSICAS, ANIMAÇÕES E CONTROLES
+        // 4. FÍSICAS, ANIMAÇÕES E CONTROLES
         // ==========================================
         this.physics.add.collider(this.jogadorAtual, layerLimites);
         this.physics.add.collider(this.jogadorAtual, layerObjetos);
@@ -230,10 +286,7 @@ export class Diario extends Scene {
         this.configurarAnimacoes();
         
         this.cursors = this.input.keyboard.createCursorKeys();
-        this.tecla1 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
-        this.tecla2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
         this.teclaEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-        
         this.teclaMaisNum = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_ADD);
         this.teclaMenosNum = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_SUBTRACT);
         this.teclaMais = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.PLUS);
@@ -254,7 +307,7 @@ export class Diario extends Scene {
     update() {
         if (this.jaEstaSaindo) return; 
 
-        const limiteQueda = this.mapaAlturaTotal + 40;
+        const limiteQueda = this.mapaAlturaTotal + 40; 
         
         if (this.jogadorAtual && this.jogadorAtual.y > limiteQueda && !this.jogadorAtual.estaRenascendo) {
             this.jogadorAtual.estaRenascendo = true;
@@ -288,11 +341,11 @@ export class Diario extends Scene {
         }
 
         if (Phaser.Input.Keyboard.JustDown(this.teclaMaisNum) || Phaser.Input.Keyboard.JustDown(this.teclaMais) || Phaser.Input.Keyboard.JustDown(this.teclaIgual)) {
-            this.scene.restart({ offsetDias: this.offsetDias + 1, personagem: this.personagemInicial });
+            this.scene.restart({ offsetDias: this.offsetDias + 1, personagem: this.personagemInicial, modoDiario: this.modoDiario });
             return;
         }
         if (Phaser.Input.Keyboard.JustDown(this.teclaMenosNum) || Phaser.Input.Keyboard.JustDown(this.teclaMenos)) {
-            this.scene.restart({ offsetDias: this.offsetDias - 1, personagem: this.personagemInicial });
+            this.scene.restart({ offsetDias: this.offsetDias - 1, personagem: this.personagemInicial, modoDiario: this.modoDiario });
             return;
         }
         if (Phaser.Input.Keyboard.JustDown(this.teclaEsc)) {
@@ -311,7 +364,6 @@ export class Diario extends Scene {
         }
 
         const body = activePlayer.body;
-        this.apertouE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
         this.apertouW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
         this.apertouA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.apertouD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
@@ -374,17 +426,9 @@ export class Diario extends Scene {
                 activePlayer.setTexture('solar_andando', 0); 
             }
         }
-
-        if (this.escuridaoSprite && activePlayer) this.escuridaoSprite.setPosition(activePlayer.x, activePlayer.y);
-        
-        if (Phaser.Input.Keyboard.JustDown(this.apertouE)) {
-            this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuroDiario').setDepth(100);
-        }
     }
 
-    voltarParaMenu() {
-        if (this.jaEstaSaindo) return;
-        this.jaEstaSaindo = true;
+    executarTransicaoSaida() {
         if (this.somQueda) this.somQueda.stop();
         if (this.cache.audio.has('caindo')) {
             this.sound.stopByKey('caindo');
@@ -398,15 +442,74 @@ export class Diario extends Scene {
         });
     }
 
+    voltarParaMenu() {
+        if (this.jaEstaSaindo) return;
+        this.jaEstaSaindo = true;
+        this.executarTransicaoSaida();
+    }
+
     completouMapaDiario(jogador, teleportador) {
         if (this.jaEstaSaindo) return;
+        this.jaEstaSaindo = true;
         
-        // Avisa o servidor que alguém concluiu o mapa diário
         if (this.socket) {
             this.socket.emit('faseDiarioConcluida');
         }
-        
-        // Sai localmente também
-        this.voltarParaMenu(); 
+
+        if (this.jogadorAtual && this.jogadorAtual.body) {
+            this.jogadorAtual.setVelocity(0, 0);
+            this.jogadorAtual.body.setEnable(false);
+        }
+
+        const width = this.scale.width;
+        const height = this.scale.height;
+
+        const containerVitoria = this.add.container(0, 0).setScrollFactor(0).setDepth(1000);
+
+        const fundo = this.add.rectangle(0, 0, width, height, 0x000000, 0.85).setOrigin(0, 0);
+        containerVitoria.add(fundo);
+
+        const nomeVencedor = this.personagemInicial.toUpperCase();
+
+        let spriteVencedor;
+        if (this.textures.exists('Personagens')) {
+            const tex = this.textures.get('Personagens');
+            const img = tex.getSourceImage();
+            const halfW = Math.floor(img.width / 2);
+            const h = img.height;
+
+            const frameKey = (this.personagemInicial === 'solar') ? 'preview_solar_frame' : 'preview_fornalha_frame';
+            if (!tex.has(frameKey)) {
+                const frameX = (this.personagemInicial === 'solar') ? 0 : halfW;
+                tex.add(frameKey, 0, frameX, 0, halfW, h);
+            }
+            spriteVencedor = this.add.image(width / 2, height / 2 - 50, 'Personagens', frameKey).setDisplaySize(140, 140);
+        } else {
+            const chaveSprite = this.personagemInicial === 'solar' ? 'solar_andando' : 'Fornalha';
+            spriteVencedor = this.add.sprite(width / 2, height / 2 - 50, chaveSprite, 0).setDisplaySize(140, 140);
+        }
+        containerVitoria.add(spriteVencedor);
+
+        const textoVitoria = this.add.text(width / 2, height / 2 + 50, `${nomeVencedor} VENCEU!`, {
+            fontFamily: "'Courier New', Courier, monospace",
+            fontSize: 32,
+            color: "#00ff66",
+            fontStyle: "bold",
+            stroke: "#000000",
+            strokeThickness: 5
+        }).setOrigin(0.5);
+        containerVitoria.add(textoVitoria);
+
+        this.tweens.add({
+            targets: textoVitoria,
+            scale: { from: 0.8, to: 1.1 },
+            duration: 400,
+            yoyo: true,
+            ease: 'Back.easeOut'
+        });
+
+        this.time.delayedCall(3000, () => {
+            this.executarTransicaoSaida();
+        });
     }
 }
