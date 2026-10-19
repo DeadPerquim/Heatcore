@@ -10,7 +10,13 @@ export class MainMenu extends Scene {
     const { width, height } = this.scale;
 
     // ==========================================
-    // 0. CONEXÃO COM O SERVIDOR MULTIPLAYER
+    // 0. CONFIGURAÇÃO GLOBAL DE ÁUDIO
+    // ==========================================
+    if (this.game.volumeMusica === undefined) this.game.volumeMusica = 0.5;
+    if (this.game.volumeSFX === undefined) this.game.volumeSFX = 0.7;
+
+    // ==========================================
+    // 0.1 CONEXÃO COM O SERVIDOR MULTIPLAYER
     // ==========================================
     const SERVER_URL = window.location.origin;
 
@@ -25,12 +31,10 @@ export class MainMenu extends Scene {
 
     this.personagensOcupados = { solar: false, fornalha: false };
 
-    // Escuta atualizações do servidor em tempo real
     this.socket.on('estadoPersonagens', (estado) => {
       this.personagensOcupados.solar = !!estado.solar && estado.solar !== this.socket.id;
       this.personagensOcupados.fornalha = !!estado.fornalha && estado.fornalha !== this.socket.id;
       
-      // Se o personagem atualmente destacado ficou ocupado por outro, alterna para o livre
       if (this.overlayAtivo) {
         if (this.overlayIndex === 0 && this.personagensOcupados.solar) this.overlayIndex = 1;
         if (this.overlayIndex === 1 && this.personagensOcupados.fornalha) this.overlayIndex = 0;
@@ -44,48 +48,126 @@ export class MainMenu extends Scene {
     });
 
     // ==========================================
-    // 1. FUNDO E ATMOSFERA
+    // 1. FUNDO DE LABORATÓRIO (COM VERIFICAÇÃO ANTI-CRASH)
     // ==========================================
-    let bgGraphics = this.make.graphics({ add: false });
-    bgGraphics.fillStyle(0x15151c, 1); 
-    bgGraphics.fillRect(0, 0, width, height); 
-    bgGraphics.generateTexture('fundo_profissional', width, height);
-    this.add.image(0, 0, 'fundo_profissional').setOrigin(0, 0);
+    if (!this.textures.exists('fundo_lab_pro')) {
+      const bgCanvas = this.textures.createCanvas('fundo_lab_pro', width, height);
+      if (bgCanvas) {
+        const ctx = bgCanvas.context;
+        let grad = ctx.createRadialGradient(width * 0.35, height * 0.45, 80, width * 0.5, height * 0.5, width * 0.85);
+        grad.addColorStop(0, '#181a26');
+        grad.addColorStop(0.55, '#0b0c12');
+        grad.addColorStop(1, '#040406');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
 
-    let vinheta = this.add.graphics();
-    vinheta.fillStyle(0x000000, 0.4);
-    vinheta.fillRect(0, 0, width, height);
-    vinheta.setBlendMode(Phaser.BlendModes.MULTIPLY);
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.025)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < width; x += 35) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+        }
+        for (let y = 0; y < height; y += 35) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+        }
+        bgCanvas.refresh();
+      }
+    }
+
+    this.add.image(0, 0, 'fundo_lab_pro').setOrigin(0, 0);
+
+    this.glowAmber = this.add.circle(width * 0.32, height * 0.42, 260, 0xff5500, 0.12)
+        .setBlendMode(Phaser.BlendModes.ADD);
+    this.glowCyan = this.add.circle(width * 0.8, height * 0.7, 220, 0x00f3ff, 0.06)
+        .setBlendMode(Phaser.BlendModes.ADD);
+
+    this.tweens.add({
+      targets: this.glowAmber,
+      alpha: { from: 0.10, to: 0.22 },
+      scale: { from: 0.95, to: 1.12 },
+      duration: 3200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
+    this.tweens.add({
+      targets: this.glowCyan,
+      alpha: { from: 0.04, to: 0.10 },
+      duration: 4000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
+    if (!this.textures.exists('particula_brasa')) {
+      let pGraphics = this.make.graphics({ add: false });
+      pGraphics.fillStyle(0xffffff, 1);
+      pGraphics.fillCircle(4, 4, 4);
+      pGraphics.generateTexture('particula_brasa', 8, 8);
+    }
+
+    this.add.particles(0, 0, 'particula_brasa', {
+      x: { min: 0, max: width },
+      y: { min: height + 10, max: height + 30 },
+      lifespan: { min: 4000, max: 7000 },
+      speedY: { min: -20, max: -55 },
+      speedX: { min: -15, max: 15 },
+      scale: { start: 0.6, end: 0 },
+      alpha: { start: 0.6, end: 0 },
+      tint: [0xffaa00, 0xff4400, 0x00f3ff, 0xffffff],
+      quantity: 1,
+      frequency: 220,
+      blendMode: 'ADD'
+    });
 
     if (this.cache.audio.exists('menu')) {
-        if (!this.sound.get('menu')) {
-            this.musicaMenu = this.sound.add('menu', {
-                loop: true,
-                volume: 0.4
-            });
-            this.musicaMenu.play();
-        } else {
-            this.musicaMenu = this.sound.get('menu');
-            if (!this.musicaMenu.isPlaying) {
-                this.musicaMenu.play();
-            }
-        }
+      if (!this.sound.get('menu')) {
+        this.musicaMenu = this.sound.add('menu', { loop: true, volume: this.game.volumeMusica });
+        this.musicaMenu.play();
+      } else {
+        this.musicaMenu = this.sound.get('menu');
+        this.musicaMenu.setVolume(this.game.volumeMusica);
+        if (!this.musicaMenu.isPlaying) this.musicaMenu.play();
+      }
     }
 
     // ==========================================
-    // 2. LOGO
+    // 2. HUD INDUSTRIAL DE LABORATÓRIO
+    // ==========================================
+    const corHud = "#00f3ff";
+    this.add.text(30, 25, "SYS_STATUS // ONLINE", {
+      fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: corHud
+    }).setAlpha(0.6);
+
+    this.add.text(30, 42, "FACILITY: SUB_LEVEL_02", {
+      fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
+    }).setAlpha(0.5);
+
+    this.add.text(width - 30, height - 30, "HEATCORE v1.0.5 - MAPA2, OPÇÕES, CRÉDITOS", {
+      fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
+    }).setOrigin(1, 1).setAlpha(0.5);
+
+    let linhaHud = this.add.graphics();
+    linhaHud.lineStyle(1, 0x00f3ff, 0.3);
+    linhaHud.lineBetween(30, 60, 220, 60);
+
+    // ==========================================
+    // 3. LOGO
     // ==========================================
     this.logoInicialX = width * 0.325;
     this.logoInicialY = height * 0.415;
 
+    this.logoGlow = this.add.circle(this.logoInicialX, this.logoInicialY, 140, 0xff6600, 0.25)
+        .setBlendMode(Phaser.BlendModes.ADD);
+
     this.logo = this.add.image(this.logoInicialX, this.logoInicialY - 50, 'logo_heatcore')
         .setOrigin(0.5)
-        .setScale(0.80)
+        .setScale(0.82)
         .setAlpha(0)
         .setBlendMode(Phaser.BlendModes.SCREEN);
 
     this.tweens.add({
-      targets: this.logo,
+      targets: [this.logo, this.logoGlow],
       y: this.logoInicialY,
       alpha: 1,
       duration: 1000,
@@ -93,59 +175,69 @@ export class MainMenu extends Scene {
     });
 
     // ==========================================
-    // 3. SISTEMA DE MENU
+    // 4. SISTEMA DE MENU PRINCIPAL
     // ==========================================
-    let startY = height * 0.315; 
-    let baseMenuX = width * 0.95; 
-    
+    this.baseMenuX = width * 0.92; 
+    this.startY = height * 0.315; 
+
     this.menuOptions = [
       { text: "JOGAR", action: () => this.abrirSelecaoPersonagem("Mapa2") },
       { text: "MAPA DIÁRIO", action: () => this.abrirSelecaoPersonagem("Diario") },
-      { text: "OPÇÕES", action: () => console.log("Opções selecionadas") },
-      { text: "CRÉDITOS", action: () => console.log("Créditos selecionados") }
+      { text: "OPÇÕES", action: () => this.abrirOpcoes() },
+      { text: "CRÉDITOS", action: () => this.irParaCreditos() }
     ];
 
     this.selectedIndex = 0; 
     this.btnObjects = [];
+    this.estadoMenu = "MAIN";
+
+    this.btnHighlightBg = this.add.rectangle(this.baseMenuX + 20, this.startY, 310, 48, 0xff9900, 0.15)
+        .setOrigin(1, 0.5)
+        .setStrokeStyle(1.5, 0xff9900, 0.8)
+        .setAlpha(0);
+
+    this.containerBotoesMenu = this.add.container(0, 0);
 
     this.menuOptions.forEach((option, index) => {
-      let btn = this.add.text(baseMenuX + 100, startY + (index * 75), option.text, {
+      let btnContainer = this.add.container(this.baseMenuX + 100, this.startY + (index * 75));
+
+      let btnText = this.add.text(0, 0, option.text, {
         fontFamily: "'Courier New', Courier, monospace",
-        fontSize: 30,
-        color: index === 0 ? "#ff9900" : "#888888",
+        fontSize: 28,
+        color: index === 0 ? "#ff9900" : "#666677",
         fontStyle: "bold",
         align: "right",
         stroke: "#000000",
         strokeThickness: 4,
-        shadow: { offsetX: 3, offsetY: 3, color: '#000', blur: 5, fill: true }
-      })
-      .setOrigin(1, 0.5)
-      .setAlpha(0)
-      .setInteractive({ useHandCursor: true }); 
+        shadow: { offsetX: 2, offsetY: 2, color: '#000', blur: 4, fill: true }
+      }).setOrigin(1, 0.5);
+
+      btnContainer.add(btnText);
+      btnContainer.setInteractive(new Phaser.Geom.Rectangle(-260, -25, 260, 50), Phaser.Geom.Rectangle.Contains);
 
       this.tweens.add({
-        targets: btn,
-        x: baseMenuX,
-        alpha: 1,
+        targets: btnContainer,
+        x: this.baseMenuX,
         duration: 800,
         delay: 300 + (index * 150),
         ease: 'Back.easeOut'
       });
 
-      btn.on('pointerover', () => {
-        if (!this.overlayAtivo) {
+      btnContainer.on('pointerover', () => {
+        if (!this.overlayAtivo && this.estadoMenu === "MAIN") {
           this.selectedIndex = index;
           this.atualizarSelecaoVisual();
         }
       });
 
-      btn.on('pointerdown', () => {
-        if (!this.overlayAtivo) {
+      btnContainer.on('pointerdown', () => {
+        if (!this.overlayAtivo && this.estadoMenu === "MAIN") {
           option.action();
         }
       });
 
-      this.btnObjects.push(btn);
+      this.btnObjects.push({ container: btnContainer, text: btnText });
+      this.containerBotoesMenu.add(btnContainer);
     });
 
     // Controles
@@ -164,10 +256,316 @@ export class MainMenu extends Scene {
     this.overlayAtivo = false;
     this.inputCooldown = 0; 
 
-    // ==========================================
-    // 4. OVERLAY DINÂMICO DE SELEÇÃO
-    // ==========================================
+    this.criarMenuOpcoes();
     this.criarOverlayPersonagens();
+    this.atualizarSelecaoVisual();
+
+    // Eventos do Navegador/Phaser para atualizar estado de Tela Cheia
+    this.scale.on('fullscreenchange', () => {
+      if (this.toggleFullscreen) {
+        this.toggleFullscreen.atualizarVisual();
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      if (this.toggleFullscreen) {
+        this.toggleFullscreen.atualizarVisual();
+      }
+    });
+  }
+
+  irParaCreditos() {
+    if (this.jaIniciou) return;
+    this.jaIniciou = true;
+
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      this.scene.start("Creditos");
+    });
+  }
+
+  // ==========================================
+  // LÓGICA E CONSTRUÇÃO DO MENU DE OPÇÕES
+  // ==========================================
+  criarMenuOpcoes() {
+    const posX = this.baseMenuX + 350; 
+
+    this.containerOpcoes = this.add.container(posX, this.startY - 30).setAlpha(0);
+
+    const tituloOpcoes = this.add.text(0, 0, "// AJUSTES DO SISTEMA", {
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: 20,
+      color: "#00f3ff",
+      fontStyle: "bold"
+    }).setOrigin(1, 0.5);
+
+    // SLIDER 1: MÚSICA
+    this.sliderMusica = this.criarSliderAudio(0, 55, "MÚSICA", this.game.volumeMusica, (val) => {
+      this.game.volumeMusica = val;
+      if (this.musicaMenu) this.musicaMenu.setVolume(val);
+    });
+
+    // SLIDER 2: EFEITOS SONOROS
+    this.sliderSFX = this.criarSliderAudio(0, 125, "EFEITOS SONOROS", this.game.volumeSFX, (val) => {
+      this.game.volumeSFX = val;
+    });
+
+    // OPÇÃO 3: TELA CHEIA (FULLSCREEN TOGGLE)
+    this.toggleFullscreen = this.criarToggleFullscreen(0, 195, "TELA CHEIA", () => {
+      this.alternarTelaCheia();
+    });
+
+    // BOTÃO VOLTAR
+    this.btnVoltarOpcoes = this.add.text(0, 265, "> [ VOLTAR ] <", {
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: 24,
+      color: "#ff9900",
+      fontStyle: "bold",
+      stroke: "#000000",
+      strokeThickness: 3
+    }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
+
+    this.btnVoltarOpcoes.on('pointerover', () => {
+      this.opcoesIndex = 3;
+      this.atualizarSelecaoOpcoes();
+    });
+
+    this.btnVoltarOpcoes.on('pointerdown', () => {
+      this.fecharOpcoes();
+    });
+
+    this.containerOpcoes.add([
+      tituloOpcoes,
+      this.sliderMusica.container,
+      this.sliderSFX.container,
+      this.toggleFullscreen.container,
+      this.btnVoltarOpcoes
+    ]);
+
+    this.opcoesIndex = 0; // 0: Música, 1: SFX, 2: Tela Cheia, 3: Voltar
+  }
+
+  criarSliderAudio(x, y, rotulo, valorInicial, onChange) {
+    const container = this.add.container(x, y);
+    const larguraTrilho = 220;
+
+    const textoRotulo = this.add.text(-larguraTrilho - 20, -18, rotulo, {
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: 15,
+      color: "#ffffff",
+      fontStyle: "bold"
+    }).setOrigin(0, 0.5);
+
+    const textoPorcentagem = this.add.text(0, -18, `${Math.round(valorInicial * 100)}%`, {
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: 15,
+      color: "#ff9900",
+      fontStyle: "bold"
+    }).setOrigin(1, 0.5);
+
+    const trilhoBg = this.add.rectangle(-larguraTrilho, 10, larguraTrilho, 10, 0x1f2233)
+        .setOrigin(0, 0.5)
+        .setStrokeStyle(1, 0x444455);
+
+    const barraPreenchimento = this.add.rectangle(-larguraTrilho, 10, larguraTrilho * valorInicial, 10, 0xff9900)
+        .setOrigin(0, 0.5);
+
+    const knob = this.add.rectangle(-larguraTrilho + (larguraTrilho * valorInicial), 10, 16, 24, 0x00f3ff)
+        .setOrigin(0.5, 0.5)
+        .setStrokeStyle(2, 0xffffff)
+        .setInteractive({ useHandCursor: true });
+
+    const areaClique = this.add.rectangle(-larguraTrilho / 2, 10, larguraTrilho + 40, 40, 0x000000, 0)
+        .setInteractive({ useHandCursor: true });
+
+    let arrastando = false;
+
+    const atualizarPorPointer = (pointer) => {
+      const trilhoInicioWorldX = this.containerOpcoes.x + x - larguraTrilho;
+      const localX = pointer.x - trilhoInicioWorldX;
+      let pct = Phaser.Math.Clamp(localX / larguraTrilho, 0, 1);
+
+      knob.x = -larguraTrilho + (larguraTrilho * pct);
+      barraPreenchimento.width = larguraTrilho * pct;
+      textoPorcentagem.setText(`${Math.round(pct * 100)}%`);
+      onChange(pct);
+    };
+
+    const iniciarArrasto = (pointer) => {
+      arrastando = true;
+      knob.setFillStyle(0xff9900);
+      atualizarPorPointer(pointer);
+    };
+
+    knob.on('pointerdown', iniciarArrasto);
+    areaClique.on('pointerdown', iniciarArrasto);
+
+    this.input.on('pointermove', (pointer) => {
+      if (arrastando && pointer.isDown) {
+        atualizarPorPointer(pointer);
+      }
+    });
+
+    this.input.on('pointerup', () => {
+      if (arrastando) {
+        arrastando = false;
+        knob.setFillStyle(0x00f3ff);
+      }
+    });
+
+    container.add([textoRotulo, textoPorcentagem, trilhoBg, barraPreenchimento, knob, areaClique]);
+
+    return {
+      container,
+      knob,
+      barraPreenchimento,
+      textoPorcentagem,
+      textoRotulo,
+      larguraTrilho,
+      getValor: () => barraPreenchimento.width / larguraTrilho,
+      setValor: (val) => {
+        let pct = Phaser.Math.Clamp(val, 0, 1);
+        knob.x = -larguraTrilho + (larguraTrilho * pct);
+        barraPreenchimento.width = larguraTrilho * pct;
+        textoPorcentagem.setText(`${Math.round(pct * 100)}%`);
+        onChange(pct);
+      }
+    };
+  }
+
+  criarToggleFullscreen(x, y, rotulo, onToggle) {
+    const container = this.add.container(x, y);
+    const larguraTrilho = 220;
+
+    const textoRotulo = this.add.text(-larguraTrilho - 20, 0, rotulo, {
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: 15,
+      color: "#ffffff",
+      fontStyle: "bold"
+    }).setOrigin(0, 0.5);
+
+    const estaEmTelaCheia = !!document.fullscreenElement || this.scale.isFullscreen;
+    
+    const textoStatus = this.add.text(0, 0, estaEmTelaCheia ? "[ X ] ATIVADO" : "[   ] DESATIVADO", {
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: 15,
+      color: estaEmTelaCheia ? "#00ff66" : "#8888aa",
+      fontStyle: "bold"
+    }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
+
+    textoStatus.on('pointerover', () => {
+      this.opcoesIndex = 2;
+      this.atualizarSelecaoOpcoes();
+    });
+
+    textoStatus.on('pointerdown', () => {
+      onToggle();
+    });
+
+    container.add([textoRotulo, textoStatus]);
+
+    const funcaoAtualizar = () => {
+      setTimeout(() => {
+        const ativo = !!document.fullscreenElement || this.scale.isFullscreen;
+        textoStatus.setText(ativo ? "[ X ] ATIVADO" : "[   ] DESATIVADO");
+        textoStatus.setColor(ativo ? "#00ff66" : "#8888aa");
+      }, 50);
+    };
+
+    return {
+      container,
+      textoRotulo,
+      textoStatus,
+      atualizarVisual: funcaoAtualizar
+    };
+  }
+
+  alternarTelaCheia() {
+    const estaAtivo = !!document.fullscreenElement || this.scale.isFullscreen;
+
+    if (estaAtivo) {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else {
+        this.scale.stopFullscreen();
+      }
+    } else {
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        this.scale.startFullscreen();
+      }
+    }
+
+    if (this.toggleFullscreen) {
+      this.toggleFullscreen.atualizarVisual();
+    }
+  }
+
+  atualizarSelecaoOpcoes() {
+    // 0: Música, 1: SFX, 2: Tela Cheia, 3: Voltar
+    this.sliderMusica.textoRotulo.setColor(this.opcoesIndex === 0 ? "#ff9900" : "#ffffff");
+    this.sliderSFX.textoRotulo.setColor(this.opcoesIndex === 1 ? "#ff9900" : "#ffffff");
+    this.toggleFullscreen.textoRotulo.setColor(this.opcoesIndex === 2 ? "#ff9900" : "#ffffff");
+    this.btnVoltarOpcoes.setColor(this.opcoesIndex === 3 ? "#ffffff" : "#ff9900");
+  }
+
+  abrirOpcoes() {
+    if (this.estadoMenu === "OPTIONS") return;
+    this.estadoMenu = "OPTIONS";
+    this.inputCooldown = 250;
+    this.opcoesIndex = 0;
+    
+    if (this.toggleFullscreen) {
+      this.toggleFullscreen.atualizarVisual();
+    }
+    
+    this.atualizarSelecaoOpcoes();
+
+    this.tweens.add({ targets: this.btnHighlightBg, alpha: 0, duration: 150 });
+
+    this.tweens.add({
+      targets: this.containerBotoesMenu,
+      x: 350,
+      alpha: 0,
+      duration: 350,
+      ease: 'Back.easeIn'
+    });
+
+    this.tweens.add({
+      targets: this.containerOpcoes,
+      x: this.baseMenuX,
+      alpha: 1,
+      duration: 400,
+      delay: 150,
+      ease: 'Back.easeOut'
+    });
+  }
+
+  fecharOpcoes() {
+    if (this.estadoMenu === "MAIN") return;
+    this.estadoMenu = "MAIN";
+    this.inputCooldown = 250;
+
+    this.tweens.add({
+      targets: this.containerOpcoes,
+      x: this.baseMenuX + 350,
+      alpha: 0,
+      duration: 300,
+      ease: 'Back.easeIn'
+    });
+
+    this.tweens.add({
+      targets: this.containerBotoesMenu,
+      x: 0,
+      alpha: 1,
+      duration: 400,
+      delay: 100,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.atualizarSelecaoVisual();
+      }
+    });
   }
 
   criarOverlayPersonagens() {
@@ -177,42 +575,58 @@ export class MainMenu extends Scene {
 
     this.overlayContainer = this.add.container(0, 0).setDepth(500).setVisible(false);
 
-    this.fundoEscuro = this.add.rectangle(0, 0, width, height, 0x000000, 0.8)
+    this.fundoEscuro = this.add.rectangle(0, 0, width, height, 0x040508, 0.88)
         .setOrigin(0, 0)
         .setInteractive();
 
     this.painelGroup = this.add.container(cX, cY);
 
-    const painelLargura = Math.min(500, width * 0.9);
-    const painelAltura = Math.min(310, height * 0.85);
+    const painelLargura = Math.min(560, width * 0.92);
+    const painelAltura = Math.min(350, height * 0.88);
 
-    const painel = this.add.rectangle(0, 0, painelLargura, painelAltura, 0x111118)
-        .setStrokeStyle(3, 0xff9900);
+    const painel = this.add.rectangle(0, 0, painelLargura, painelAltura, 0x0c0d16)
+        .setStrokeStyle(2, 0x00f3ff);
 
-    const titulo = this.add.text(0, -(painelAltura * 0.36), "ESCOLHA SEU PERSONAGEM", {
+    const molduraExterna = this.add.rectangle(0, 0, painelLargura + 8, painelAltura + 8, 0x000000, 0)
+        .setStrokeStyle(1, 0xff9900, 0.5);
+
+    const topoBarra = this.add.rectangle(0, -(painelAltura / 2) + 20, painelLargura, 40, 0x141624);
+    const luzStatus = this.add.circle(-(painelLargura / 2) + 25, -(painelAltura / 2) + 20, 5, 0x00ff66);
+    
+    this.tweens.add({
+      targets: luzStatus,
+      alpha: { from: 0.3, to: 1 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1
+    });
+
+    const titulo = this.add.text(0, -(painelAltura / 2) + 20, "// SELEÇÃO DE OPERADOR //", {
       fontFamily: "'Courier New', Courier, monospace",
-      fontSize: 20,
-      color: "#ff9900",
-      fontStyle: "bold",
-      stroke: "#000000",
-      strokeThickness: 3
+      fontSize: 16,
+      color: "#00f3ff",
+      fontStyle: "bold"
     }).setOrigin(0.5);
 
-    this.cardSolar = this.criarCardPersonagem(-105, -10, "SOLAR", "preview_solar", () => {
+    this.cardSolar = this.criarCardPersonagem(-125, 15, "SOLAR", () => {
       if (this.inputCooldown <= 0 && !this.personagensOcupados.solar) this.confirmarSelecao("solar");
     });
 
-    this.cardFornalha = this.criarCardPersonagem(105, -10, "FORNALHA", "preview_fornalha", () => {
+    this.cardFornalha = this.criarCardPersonagem(125, 15, "FORNALHA", () => {
       if (this.inputCooldown <= 0 && !this.personagensOcupados.fornalha) this.confirmarSelecao("fornalha");
     });
 
-    this.btnCancelarOverlay = this.add.text(0, painelAltura * 0.38, "[ ESC / VOLTAR ]", {
+    this.btnCancelarOverlay = this.add.text(0, painelAltura * 0.39, "[ ESC / VOLTAR ]", {
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 14,
       color: "#ff4444",
+      fontStyle: "bold",
       stroke: "#000000",
-      strokeThickness: 2
+      strokeThickness: 3
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+    this.btnCancelarOverlay.on('pointerover', () => this.btnCancelarOverlay.setColor("#ffffff"));
+    this.btnCancelarOverlay.on('pointerout', () => this.btnCancelarOverlay.setColor("#ff4444"));
 
     this.btnCancelarOverlay.on('pointerdown', () => {
       if (this.inputCooldown <= 0) this.fecharOverlay();
@@ -220,6 +634,9 @@ export class MainMenu extends Scene {
 
     this.painelGroup.add([
       painel,
+      molduraExterna,
+      topoBarra,
+      luzStatus,
       titulo,
       this.cardSolar.container,
       this.cardFornalha.container,
@@ -234,12 +651,22 @@ export class MainMenu extends Scene {
     this.overlayIndex = 0;
   }
 
-  criarCardPersonagem(x, y, nome, chaveImagem, onSelect) {
+  criarCardPersonagem(x, y, nome, onSelect) {
     const containerCard = this.add.container(x, y);
 
-    const bgCard = this.add.rectangle(0, 0, 170, 170, 0x22222c)
-        .setStrokeStyle(2, 0x555555)
+    const bgCard = this.add.rectangle(0, 0, 200, 200, 0x141622)
+        .setStrokeStyle(2, 0x333345)
         .setInteractive({ useHandCursor: true });
+
+    const scannerGlow = this.add.rectangle(0, 0, 190, 190, 0xff9900, 0.12).setVisible(false);
+
+    const cantoneiras = this.add.graphics();
+    cantoneiras.lineStyle(2, 0x00f3ff, 0.8);
+    cantoneiras.moveTo(-90, -75); cantoneiras.lineTo(-90, -90); cantoneiras.lineTo(-75, -90);
+    cantoneiras.moveTo(75, -90); cantoneiras.lineTo(90, -90); cantoneiras.lineTo(90, -75);
+    cantoneiras.moveTo(-90, 75); cantoneiras.lineTo(-90, 90); cantoneiras.lineTo(-75, 90);
+    cantoneiras.moveTo(75, 90); cantoneiras.lineTo(90, 90); cantoneiras.lineTo(90, 75);
+    cantoneiras.strokePath();
 
     let spritePreview;
 
@@ -256,24 +683,25 @@ export class MainMenu extends Scene {
         tex.add(frameKey, 0, frameX, 0, halfW, h);
       }
 
-      spritePreview = this.add.image(0, -15, 'Personagens', frameKey).setDisplaySize(80, 80);
+      spritePreview = this.add.image(0, -18, 'Personagens', frameKey).setDisplaySize(95, 95);
     } else {
-      spritePreview = this.add.rectangle(0, -15, 80, 80, 0x333344).setStrokeStyle(1, 0x666688);
+      spritePreview = this.add.rectangle(0, -18, 90, 90, 0x222233).setStrokeStyle(1, 0x555577);
     }
 
-    const textoNome = this.add.text(0, 45, nome, {
+    const textoNome = this.add.text(0, 52, nome, {
       fontFamily: "'Courier New', Courier, monospace",
-      fontSize: 16,
+      fontSize: 18,
       color: "#ffffff",
       fontStyle: "bold"
     }).setOrigin(0.5);
 
-    const textoOcupado = this.add.text(0, 63, "SELECIONADO", {
+    const bgBadge = this.add.rectangle(0, 74, 110, 18, 0x000000, 0.6);
+    const textoStatus = this.add.text(0, 74, "[ LIVRE ]", {
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 11,
-      color: "#ff3333",
+      color: "#00ff66",
       fontStyle: "bold"
-    }).setOrigin(0.5).setVisible(false);
+    }).setOrigin(0.5);
 
     bgCard.on('pointerover', () => {
       if (this.overlayAtivo) {
@@ -281,23 +709,38 @@ export class MainMenu extends Scene {
         const estaOcupado = (targetIndex === 0) ? this.personagensOcupados.solar : this.personagensOcupados.fornalha;
         if (!estaOcupado) {
           this.overlayIndex = targetIndex;
-          this.atualizarSelecaoVisual();
+          this.atualizarVisualOverlay();
         }
       }
     });
 
     bgCard.on('pointerdown', onSelect);
 
-    containerCard.add([bgCard, spritePreview, textoNome, textoOcupado]);
+    containerCard.add([
+      bgCard, 
+      scannerGlow, 
+      cantoneiras, 
+      spritePreview, 
+      textoNome, 
+      bgBadge, 
+      textoStatus
+    ]);
 
-    return { container: containerCard, bgCard: bgCard, textoNome: textoNome, textoOcupado: textoOcupado, spritePreview: spritePreview };
+    return { 
+      container: containerCard, 
+      bgCard: bgCard, 
+      scannerGlow: scannerGlow,
+      cantoneiras: cantoneiras,
+      textoNome: textoNome, 
+      textoStatus: textoStatus, 
+      spritePreview: spritePreview 
+    };
   }
 
   abrirSelecaoPersonagem(cenaDestino) {
     this.cenaDestino = cenaDestino;
     this.overlayAtivo = true;
     
-    // Escolhe automaticamente o primeiro disponível
     this.overlayIndex = this.personagensOcupados.solar ? 1 : 0;
     this.inputCooldown = 350; 
     
@@ -307,7 +750,7 @@ export class MainMenu extends Scene {
     this.fundoEscuro.setAlpha(0);
     this.painelGroup.setAlpha(0).setScale(0.75);
 
-    this.tweens.add({ targets: this.fundoEscuro, alpha: 0.8, duration: 200, ease: 'Linear' });
+    this.tweens.add({ targets: this.fundoEscuro, alpha: 0.88, duration: 200, ease: 'Linear' });
     this.tweens.add({ targets: this.painelGroup, alpha: 1, scaleX: 1, scaleY: 1, duration: 300, ease: 'Back.easeOut' });
   }
 
@@ -331,50 +774,57 @@ export class MainMenu extends Scene {
   }
 
   atualizarVisualOverlay() {
-    // SOLAR
     if (this.personagensOcupados.solar) {
-      this.cardSolar.bgCard.setStrokeStyle(2, 0x333333).setFillStyle(0x111115);
-      this.cardSolar.textoNome.setColor("#555555");
-      this.cardSolar.spritePreview.setAlpha(0.3);
-      this.cardSolar.textoOcupado.setVisible(true);
+      this.cardSolar.bgCard.setStrokeStyle(2, 0x22222a).setFillStyle(0x0e0e14);
+      this.cardSolar.scannerGlow.setVisible(false);
+      this.cardSolar.cantoneiras.setAlpha(0.2);
+      this.cardSolar.textoNome.setColor("#444455");
+      this.cardSolar.spritePreview.setAlpha(0.2);
+      this.cardSolar.textoStatus.setText("EM USO").setColor("#ff3333");
     } else if (this.overlayIndex === 0) {
-      this.cardSolar.bgCard.setStrokeStyle(3, 0xff9900).setFillStyle(0x333344);
+      this.cardSolar.bgCard.setStrokeStyle(3, 0xff9900).setFillStyle(0x1d2133);
+      this.cardSolar.scannerGlow.setVisible(true);
+      this.cardSolar.cantoneiras.setAlpha(1);
       this.cardSolar.textoNome.setColor("#ff9900");
       this.cardSolar.spritePreview.setAlpha(1);
-      this.cardSolar.textoOcupado.setVisible(false);
+      this.cardSolar.textoStatus.setText("PRONTO").setColor("#00f3ff");
     } else {
-      this.cardSolar.bgCard.setStrokeStyle(2, 0x555555).setFillStyle(0x22222c);
+      this.cardSolar.bgCard.setStrokeStyle(2, 0x333345).setFillStyle(0x141622);
+      this.cardSolar.scannerGlow.setVisible(false);
+      this.cardSolar.cantoneiras.setAlpha(0.5);
       this.cardSolar.textoNome.setColor("#ffffff");
-      this.cardSolar.spritePreview.setAlpha(1);
-      this.cardSolar.textoOcupado.setVisible(false);
+      this.cardSolar.spritePreview.setAlpha(0.85);
+      this.cardSolar.textoStatus.setText("LIVRE").setColor("#00ff66");
     }
 
-    // FORNALHA
     if (this.personagensOcupados.fornalha) {
-      this.cardFornalha.bgCard.setStrokeStyle(2, 0x333333).setFillStyle(0x111115);
-      this.cardFornalha.textoNome.setColor("#555555");
-      this.cardFornalha.spritePreview.setAlpha(0.3);
-      this.cardFornalha.textoOcupado.setVisible(true);
+      this.cardFornalha.bgCard.setStrokeStyle(2, 0x22222a).setFillStyle(0x0e0e14);
+      this.cardFornalha.scannerGlow.setVisible(false);
+      this.cardFornalha.cantoneiras.setAlpha(0.2);
+      this.cardFornalha.textoNome.setColor("#444455");
+      this.cardFornalha.spritePreview.setAlpha(0.2);
+      this.cardFornalha.textoStatus.setText("EM USO").setColor("#ff3333");
     } else if (this.overlayIndex === 1) {
-      this.cardFornalha.bgCard.setStrokeStyle(3, 0xff9900).setFillStyle(0x333344);
+      this.cardFornalha.bgCard.setStrokeStyle(3, 0xff9900).setFillStyle(0x1d2133);
+      this.cardFornalha.scannerGlow.setVisible(true);
+      this.cardFornalha.cantoneiras.setAlpha(1);
       this.cardFornalha.textoNome.setColor("#ff9900");
       this.cardFornalha.spritePreview.setAlpha(1);
-      this.cardFornalha.textoOcupado.setVisible(false);
+      this.cardFornalha.textoStatus.setText("PRONTO").setColor("#00f3ff");
     } else {
-      this.cardFornalha.bgCard.setStrokeStyle(2, 0x555555).setFillStyle(0x22222c);
+      this.cardFornalha.bgCard.setStrokeStyle(2, 0x333345).setFillStyle(0x141622);
+      this.cardFornalha.scannerGlow.setVisible(false);
+      this.cardFornalha.cantoneiras.setAlpha(0.5);
       this.cardFornalha.textoNome.setColor("#ffffff");
-      this.cardFornalha.spritePreview.setAlpha(1);
-      this.cardFornalha.textoOcupado.setVisible(false);
+      this.cardFornalha.spritePreview.setAlpha(0.85);
+      this.cardFornalha.textoStatus.setText("LIVRE").setColor("#00ff66");
     }
   }
 
   confirmarSelecao(personagemEscolhido) {
     if (this.jaIniciou) return;
     
-    // 🛡️ BLINDA A IDENTIDADE GLOBAL NA SESSÃO DO JOGO
     this.game.meuPersonagem = personagemEscolhido;
-
-    // Solicita ao servidor reservar o personagem
     this.socket.emit('selecionarPersonagem', personagemEscolhido);
 
     const cardEscolhido = (personagemEscolhido === 'solar') ? this.cardSolar.container : this.cardFornalha.container;
@@ -390,7 +840,6 @@ export class MainMenu extends Scene {
       yoyo: true,
       ease: 'Quad.easeInOut',
       onComplete: () => {
-        // 🎵 Para a música do menu instantaneamente ao iniciar a transição
         if (this.musicaMenu) {
             this.musicaMenu.stop();
         }
@@ -411,12 +860,15 @@ export class MainMenu extends Scene {
 
   update(time, delta) {
     const ponteiro = this.input.activePointer;
-    let deslocamentoX = (ponteiro.x - this.logoInicialX) / 30;
-    let deslocamentoY = (ponteiro.y - this.logoInicialY) / 40;
+    let deslocamentoX = (ponteiro.x - this.logoInicialX) / 35;
+    let deslocamentoY = (ponteiro.y - this.logoInicialY) / 45;
 
     this.logo.x = this.logoInicialX + deslocamentoX;
     this.logo.y = this.logoInicialY + deslocamentoY;
-    this.logo.rotation = deslocamentoX * 0.003;
+    this.logo.rotation = deslocamentoX * 0.002;
+
+    this.logoGlow.x = this.logo.x;
+    this.logoGlow.y = this.logo.y;
 
     if (this.jaIniciou) return;
 
@@ -461,6 +913,49 @@ export class MainMenu extends Scene {
       return;
     }
 
+    if (this.estadoMenu === "OPTIONS") {
+      if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
+        this.fecharOpcoes();
+        return;
+      }
+
+      if (this.inputCooldown <= 0) {
+        let moverCima = Phaser.Input.Keyboard.JustDown(this.keyUp) || Phaser.Input.Keyboard.JustDown(this.keyW);
+        let moverBaixo = Phaser.Input.Keyboard.JustDown(this.keyDown) || Phaser.Input.Keyboard.JustDown(this.keyS);
+        let moverEsq = Phaser.Input.Keyboard.JustDown(this.keyLeft) || Phaser.Input.Keyboard.JustDown(this.keyA);
+        let moverDir = Phaser.Input.Keyboard.JustDown(this.keyRight) || Phaser.Input.Keyboard.JustDown(this.keyD);
+        let confirmar = Phaser.Input.Keyboard.JustDown(this.keyEnter);
+
+        if (moverCima) {
+          this.opcoesIndex--;
+          if (this.opcoesIndex < 0) this.opcoesIndex = 3;
+          this.atualizarSelecaoOpcoes();
+          this.inputCooldown = 180;
+        } else if (moverBaixo) {
+          this.opcoesIndex++;
+          if (this.opcoesIndex > 3) this.opcoesIndex = 0;
+          this.atualizarSelecaoOpcoes();
+          this.inputCooldown = 180;
+        }
+
+        if (this.opcoesIndex === 0) {
+          if (this.keyLeft.isDown || this.keyA.isDown) this.sliderMusica.setValor(this.game.volumeMusica - 0.01);
+          if (this.keyRight.isDown || this.keyD.isDown) this.sliderMusica.setValor(this.game.volumeMusica + 0.01);
+        } else if (this.opcoesIndex === 1) {
+          if (this.keyLeft.isDown || this.keyA.isDown) this.sliderSFX.setValor(this.game.volumeSFX - 0.01);
+          if (this.keyRight.isDown || this.keyD.isDown) this.sliderSFX.setValor(this.game.volumeSFX + 0.01);
+        } else if (this.opcoesIndex === 2) {
+          if (confirmar || moverEsq || moverDir) {
+            this.alternarTelaCheia();
+            this.inputCooldown = 250;
+          }
+        } else if (this.opcoesIndex === 3 && confirmar) {
+          this.fecharOpcoes();
+        }
+      }
+      return;
+    }
+
     let moverCima = Phaser.Input.Keyboard.JustDown(this.keyUp) || Phaser.Input.Keyboard.JustDown(this.keyW);
     let moverBaixo = Phaser.Input.Keyboard.JustDown(this.keyDown) || Phaser.Input.Keyboard.JustDown(this.keyS);
     let confirmar = Phaser.Input.Keyboard.JustDown(this.keyEnter);
@@ -494,16 +989,30 @@ export class MainMenu extends Scene {
   }
 
   atualizarSelecaoVisual() {
-    this.btnObjects.forEach((btn, index) => {
-      if (index === this.selectedIndex) {
-        btn.setColor("#ff9900"); 
-        if (btn.scaleX !== 1.1) {
-          this.tweens.add({ targets: btn, scaleX: 1.1, scaleY: 1.1, duration: 100, ease: 'Power1' });
+    this.btnObjects.forEach((btnObj, index) => {
+      const isSelected = index === this.selectedIndex;
+
+      if (isSelected) {
+        btnObj.text.setColor("#ff9900");
+        btnObj.text.setText(`> ${this.menuOptions[index].text} <`);
+
+        if (btnObj.container.scaleX !== 1.05) {
+          this.tweens.add({ targets: btnObj.container, scaleX: 1.05, scaleY: 1.05, duration: 120, ease: 'Power1' });
         }
+
+        this.tweens.add({
+          targets: this.btnHighlightBg,
+          y: this.startY + (index * 75),
+          alpha: 1,
+          duration: 150,
+          ease: 'Power1'
+        });
       } else {
-        btn.setColor("#888888"); 
-        if (btn.scaleX !== 1.0) {
-          this.tweens.add({ targets: btn, scaleX: 1.0, scaleY: 1.0, duration: 100, ease: 'Power1' });
+        btnObj.text.setColor("#666677");
+        btnObj.text.setText(this.menuOptions[index].text);
+
+        if (btnObj.container.scaleX !== 1.0) {
+          this.tweens.add({ targets: btnObj.container, scaleX: 1.0, scaleY: 1.0, duration: 120, ease: 'Power1' });
         }
       }
     });

@@ -7,6 +7,7 @@ import { Preloader } from "./scenes/Preloader";
 import { AUTO, Game } from "phaser";
 import { Diario } from "./scenes/Diario.js";
 import { PlacarTransicao } from './scenes/PlacarTransicao.js';
+import { Creditos } from './scenes/Creditos';
 
 const config = {
   type: AUTO,
@@ -29,7 +30,7 @@ const config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [Boot, Preloader, MainMenu, MainGame, GameOver, Mapa2, Diario, PlacarTransicao],
+  scene: [Boot, Preloader, MainMenu, MainGame, GameOver, Mapa2, Diario, PlacarTransicao, Creditos],
 };
 
 const StartGame = (parent) => {

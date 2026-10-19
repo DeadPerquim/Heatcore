@@ -6,7 +6,14 @@ export class Mapa2 extends Scene {
     }
 
     init(data) {
-        this.personagemInicial = data ? (data.personagem || 'solar') : 'solar';
+        // Prioriza rigorosamente o personagem guardado globalmente na sessão do jogo
+        this.personagemInicial = this.game.meuPersonagem || (data && data.personagem) || 'solar';
+        this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
+        
+        this.pontosSolar = data ? (data.pontosSolar || 0) : 0;
+        this.pontosFornalha = data ? (data.pontosFornalha || 0) : 0;
+
+        console.log(`🛡️ [MAPA2] Esta aba é rigorosamente o: ${this.personagemInicial.toUpperCase()}`);
     }
 
     create() {
@@ -16,7 +23,6 @@ export class Mapa2 extends Scene {
         // 0. CONEXÃO SOCKET.IO & MULTIPLAYER
         // ==========================================
         this.socket = this.game.socket;
-        this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
 
         if (this.socket) {
             this.socket.off('irParaTransicao');
@@ -32,7 +38,7 @@ export class Mapa2 extends Scene {
         }
 
         // ==========================================
-        // 1. CRIAÇÃO DO MAPA
+        // 1. CRIAÇÃO DO MAPA E LIMITES DE QUEDA
         // ==========================================
         const map = this.make.tilemap({ key: 'mapa2' });
 
@@ -54,11 +60,14 @@ export class Mapa2 extends Scene {
             this.somQueda = this.sound.add('som_queda');
         }
 
+        this.mapaAlturaTotal = map.heightInPixels;
 
         layerLimites.setCollisionByExclusion([-1]);
         layerObjetos.setCollisionByExclusion([-1]);
         
+        // ⚙️ DESATIVA A COLISÃO DO CHÃO DO MUNDO PARA PERMITIR CAIR NO ABISMO
         this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+        this.physics.world.setBoundsCollision(true, true, true, false);
 
         // ==========================================
         // ESCURIDÃO COM FURO CIRCULAR
@@ -83,32 +92,29 @@ export class Mapa2 extends Scene {
         }
 
         // ==========================================
-        // 2. SPAWN DO PERSONAGEM LOCAL E REMOTO (SEPARADOS E SEGUROS)
+        // 2. SPAWN DO PERSONAGEM LOCAL E REMOTO
         // ==========================================
         const posicoesSpawn = {
             solar: { x: 247.5, y: 370 },
-            fornalha: { x: 800, y: 370 }
+            fornalha: { x: 1100, y: 370 }
         };
 
         const coordLocal = posicoesSpawn[this.personagemInicial];
         const chaveLocal = this.personagemInicial === 'solar' ? 'solar_andando' : 'Fornalha';
 
-        // Cria o nosso jogador local
         this.jogadorAtual = this.physics.add.sprite(coordLocal.x, coordLocal.y, chaveLocal);
         this.jogadorAtual.setCircle(8).setCollideWorldBounds(true);
         this.jogadorAtual.spawnX = this.jogadorAtual.x;
         this.jogadorAtual.spawnY = this.jogadorAtual.y;
         this.jogadorAtual.estaRenascendo = false;
 
-        // Cria o sprite remoto bem longe ou oculto para evitar sobreposição visual imediata
         const coordOutro = posicoesSpawn[this.outroPersonagemTipo];
         const chaveSpriteOutro = this.outroPersonagemTipo === 'solar' ? 'solar_andando' : 'Fornalha';
 
         this.outroSprite = this.add.sprite(coordOutro.x, coordOutro.y, chaveSpriteOutro).setAlpha(0.9).setDepth(50);
-        this.outroSprite.setVisible(false); // Só aparece quando a rede enviar a posição real!
+        this.outroSprite.setVisible(false);
 
         if (this.socket) {
-            // Remove qualquer listener antigo acumulado de cenas anteriores
             this.socket.off('atualizarPosicoes');
             this.socket.on('atualizarPosicoes', (posicoes) => {
                 if (!posicoes) return;
@@ -116,18 +122,18 @@ export class Mapa2 extends Scene {
                 if (dadosOutro && this.outroSprite) {
                     this.outroSprite.x = dadosOutro.x;
                     this.outroSprite.y = dadosOutro.y;
-                    this.outroSprite.setVisible(true); // Agora sim, mostra na posição correta da rede
+                    this.outroSprite.setVisible(true);
                 }
             });
         }
 
         // ==========================================
-        // 2.1 CRIAÇÃO DOS TELEPORTADORES DE FASE 
+        // 2.1 TELEPORTADORES
         // ==========================================
         this.teleporters = this.physics.add.staticGroup();
 
-        const teleporter1 = this.teleporters.create(210, 510, 'corredorEsquerdo').setVisible(false);
-        const teleporter2 = this.teleporters.create(720, 290, 'corredorDireito').setVisible(false);
+        const teleporter1 = this.teleporters.create(210, 370, 'corredorEsquerdo').setVisible(false);
+        const teleporter2 = this.teleporters.create(1150, 370, 'corredorDireito').setVisible(false);
 
         // ==========================================
         // 3. COLISÕES E CÂMERA
@@ -170,7 +176,8 @@ export class Mapa2 extends Scene {
     update() {
         if (this.jaEstaSaindo) return;
 
-        const limiteQueda = this.mapaAlturaTotal;
+        // ⚙️ DETECÇÃO DE QUEDA E RENASCIMENTO
+        const limiteQueda = this.mapaAlturaTotal + 20;
         
         if (this.jogadorAtual && this.jogadorAtual.y > limiteQueda && !this.jogadorAtual.estaRenascendo) {
             this.jogadorAtual.estaRenascendo = true;
@@ -204,7 +211,7 @@ export class Mapa2 extends Scene {
         }
 
         const activePlayer = this.jogadorAtual;
-        if (!activePlayer || !activePlayer.body) return;
+        if (!activePlayer || !activePlayer.body || activePlayer.estaRenascendo) return;
 
         // Envia a posição atual para o servidor
         if (this.socket) {
@@ -282,25 +289,13 @@ export class Mapa2 extends Scene {
         }
     }
 
-    init(data) {
-        // Prioriza estritamente o personagem guardado globalmente no jogo ou o passado nos dados válidos
-        this.personagemInicial = (data && data.personagem) ? data.personagem : (this.game.meuPersonagem || 'solar');
-        this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
-        
-        this.pontosSolar = data ? (data.pontosSolar || 0) : 0;
-        this.pontosFornalha = data ? (data.pontosFornalha || 0) : 0;
-
-        console.log(`🛡️ [SEGURANÇA] Esta aba é rigorosamente o: ${this.personagemInicial.toUpperCase()}`);
-    }
-
     completouFase(jogador, teleportador) {
         if (this.jaEstaSaindo) return;
 
-        // O ponto vai SEMPRE para quem esta aba está a controlar, sem margem para bugs
         const quemMarcouPonto = this.personagemInicial; 
 
         const dadosTransicao = {
-            proximaCena: 'Mapa3', // (ou Mapa2 se estiveres no Game.js)
+            proximaCena: 'Mapa3',
             personagem: this.personagemInicial,
             pontosSolar: this.pontosSolar,
             pontosFornalha: this.pontosFornalha,
