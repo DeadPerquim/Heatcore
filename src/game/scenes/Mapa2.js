@@ -6,7 +6,6 @@ export class Mapa2 extends Scene {
     }
 
     init(data) {
-        // Prioriza rigorosamente o personagem guardado globalmente na sessão do jogo
         this.personagemInicial = this.game.meuPersonagem || (data && data.personagem) || 'solar';
         this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
         
@@ -65,7 +64,6 @@ export class Mapa2 extends Scene {
         layerLimites.setCollisionByExclusion([-1]);
         layerObjetos.setCollisionByExclusion([-1]);
         
-        // ⚙️ DESATIVA A COLISÃO DO CHÃO DO MUNDO PARA PERMITIR CAIR NO ABISMO
         this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.physics.world.setBoundsCollision(true, true, true, false);
 
@@ -176,7 +174,6 @@ export class Mapa2 extends Scene {
     update() {
         if (this.jaEstaSaindo) return;
 
-        // ⚙️ DETECÇÃO DE QUEDA E RENASCIMENTO
         const limiteQueda = this.mapaAlturaTotal + 20;
         
         if (this.jogadorAtual && this.jogadorAtual.y > limiteQueda && !this.jogadorAtual.estaRenascendo) {
@@ -213,7 +210,6 @@ export class Mapa2 extends Scene {
         const activePlayer = this.jogadorAtual;
         if (!activePlayer || !activePlayer.body || activePlayer.estaRenascendo) return;
 
-        // Envia a posição atual para o servidor
         if (this.socket) {
             this.socket.emit('enviarPosicao', {
                 x: activePlayer.x,
@@ -233,13 +229,39 @@ export class Mapa2 extends Scene {
         let tentouPular = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space) || this.apertouW.isDown;
         let estaCorrendo = this.apertouShift.isDown;
 
+        // ==========================================
+        // MAPEAMENTO DO CONTROLE SUPER NINTENDINHO
+        // ==========================================
         const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+
+        const isBtnPressed = (padObj, index) => {
+            if (!padObj || !padObj.buttons || !padObj.buttons[index]) return false;
+            return padObj.buttons[index].pressed || padObj.buttons[index].value > 0.5;
+        };
+
         if (pad) {
-            const axisX = pad.leftStick.x;
-            if (axisX < -0.2) indoEsquerda = true;
-            if (axisX > 0.2) indoDireita = true;
-            if (pad.A || (pad.buttons.length > 0 && pad.buttons[0].pressed)) tentouPular = true;
-            if (pad.R2 > 0.1 || (pad.buttons.length > 7 && pad.buttons[7].value > 0.1)) estaCorrendo = true;
+            const axisX = pad.leftStick ? pad.leftStick.x : 0;
+            if (axisX < -0.2 || pad.left || isBtnPressed(pad, 14)) indoEsquerda = true;
+            if (axisX > 0.2 || pad.right || isBtnPressed(pad, 15)) indoDireita = true;
+
+            // PULAR: Botão B (Amarelo / debaixo - index 0)
+            if (isBtnPressed(pad, 2)) {
+                tentouPular = true;
+            }
+
+            // CORRER: Botão RB / R (Gatilho de ombro direito - index 5)
+            if (isBtnPressed(pad, 6) || isBtnPressed(pad, 3)) {
+                estaCorrendo = true;
+            }
+
+            // CANCELAR / VOLTAR: Botão A (Vermelho / direita - index 1) ou SELECT (index 8)
+            if (isBtnPressed(pad, 1) || isBtnPressed(pad, 8)) {
+                if (this.scene.isActive('Mapa2')) {
+                    this.scene.stop('Mapa2');
+                    this.scene.start('MainMenu');
+                }
+                return;
+            }
         }
 
         const noChao = body.blocked.down || body.touching.down || body.onFloor();

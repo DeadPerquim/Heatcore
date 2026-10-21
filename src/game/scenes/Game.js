@@ -6,7 +6,13 @@ export class Game extends Scene {
     }
 
     init(data) {
-        this.personagemInicial = data ? (data.personagem || 'solar') : 'solar';
+        this.personagemInicial = (data && data.personagem) ? data.personagem : (this.game.meuPersonagem || 'solar');
+        this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
+        
+        this.pontosSolar = data ? (data.pontosSolar || 0) : 0;
+        this.pontosFornalha = data ? (data.pontosFornalha || 0) : 0;
+
+        console.log(`🛡️ [SEGURANÇA] Esta aba é rigorosamente o: ${this.personagemInicial.toUpperCase()}`);
     }
 
     create() {
@@ -16,7 +22,6 @@ export class Game extends Scene {
         // 0. CONEXÃO SOCKET.IO & MULTIPLAYER
         // ==========================================
         this.socket = this.game.socket;
-        this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
 
         if (this.socket) {
             this.socket.off('irParaTransicao');
@@ -78,7 +83,7 @@ export class Game extends Scene {
         }
 
         // ==========================================
-        // 2. SPAWN DO PERSONAGEM LOCAL E REMOTO (SEPARADOS E SEGUROS)
+        // 2. SPAWN DO PERSONAGEM LOCAL E REMOTO
         // ==========================================
         const posicoesSpawn = {
             solar: { x: 247.5, y: 520 },
@@ -88,22 +93,19 @@ export class Game extends Scene {
         const coordLocal = posicoesSpawn[this.personagemInicial];
         const chaveLocal = this.personagemInicial === 'solar' ? 'solar_andando' : 'Fornalha';
 
-        // Cria o nosso jogador local
         this.jogadorAtual = this.physics.add.sprite(coordLocal.x, coordLocal.y, chaveLocal);
         this.jogadorAtual.setCircle(8).setCollideWorldBounds(true);
         this.jogadorAtual.spawnX = this.jogadorAtual.x;
         this.jogadorAtual.spawnY = this.jogadorAtual.y;
         this.jogadorAtual.estaRenascendo = false;
 
-        // Cria o sprite remoto bem longe ou oculto para evitar sobreposição visual imediata
         const coordOutro = posicoesSpawn[this.outroPersonagemTipo];
         const chaveSpriteOutro = this.outroPersonagemTipo === 'solar' ? 'solar_andando' : 'Fornalha';
 
         this.outroSprite = this.add.sprite(coordOutro.x, coordOutro.y, chaveSpriteOutro).setAlpha(0.9).setDepth(50);
-        this.outroSprite.setVisible(false); // Só aparece quando a rede enviar a posição real!
+        this.outroSprite.setVisible(false);
 
         if (this.socket) {
-            // Remove qualquer listener antigo acumulado de cenas anteriores
             this.socket.off('atualizarPosicoes');
             this.socket.on('atualizarPosicoes', (posicoes) => {
                 if (!posicoes) return;
@@ -111,7 +113,7 @@ export class Game extends Scene {
                 if (dadosOutro && this.outroSprite) {
                     this.outroSprite.x = dadosOutro.x;
                     this.outroSprite.y = dadosOutro.y;
-                    this.outroSprite.setVisible(true); // Agora sim, mostra na posição correta da rede
+                    this.outroSprite.setVisible(true);
                 }
             });
         }
@@ -168,7 +170,6 @@ export class Game extends Scene {
         const activePlayer = this.jogadorAtual;
         if (!activePlayer || !activePlayer.body) return;
 
-        // Envia a posição atual para o servidor
         if (this.socket) {
             this.socket.emit('enviarPosicao', {
                 x: activePlayer.x,
@@ -188,13 +189,39 @@ export class Game extends Scene {
         let tentouPular = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space) || this.apertouW.isDown;
         let estaCorrendo = this.apertouShift.isDown;
 
+        // ==========================================
+        // MAPEAMENTO DO CONTROLE SUPER NINTENDINHO
+        // ==========================================
         const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+
+        const isBtnPressed = (padObj, index) => {
+            if (!padObj || !padObj.buttons || !padObj.buttons[index]) return false;
+            return padObj.buttons[index].pressed || padObj.buttons[index].value > 0.5;
+        };
+
         if (pad) {
-            const axisX = pad.leftStick.x;
-            if (axisX < -0.2) indoEsquerda = true;
-            if (axisX > 0.2) indoDireita = true;
-            if (pad.A || (pad.buttons.length > 0 && pad.buttons[0].pressed)) tentouPular = true;
-            if (pad.R2 > 0.1 || (pad.buttons.length > 7 && pad.buttons[7].value > 0.1)) estaCorrendo = true;
+            const axisX = pad.leftStick ? pad.leftStick.x : 0;
+            if (axisX < -0.2 || pad.left || isBtnPressed(pad, 14)) indoEsquerda = true;
+            if (axisX > 0.2 || pad.right || isBtnPressed(pad, 15)) indoDireita = true;
+
+            // PULAR: Botão B (Amarelo / debaixo - index 0)
+            if (isBtnPressed(pad, 2)) {
+                tentouPular = true;
+            }
+
+            // CORRER: Botão RB / R (Gatilho de ombro direito - index 5)
+            if (isBtnPressed(pad, 6) || isBtnPressed(pad, 3)) {
+                estaCorrendo = true;
+            }
+
+            // CANCELAR / VOLTAR: Botão A (Vermelho / direita - index 1) ou SELECT (index 8)
+            if (isBtnPressed(pad, 1) || isBtnPressed(pad, 8)) {
+                if (this.scene.isActive('Game')) {
+                    this.scene.stop('Game');
+                    this.scene.start('MainMenu');
+                }
+                return;
+            }
         }
 
         const noChao = body.blocked.down || body.touching.down || body.onFloor();
@@ -244,25 +271,13 @@ export class Game extends Scene {
         }
     }
 
-    init(data) {
-        // Prioriza estritamente o personagem guardado globalmente no jogo ou o passado nos dados válidos
-        this.personagemInicial = (data && data.personagem) ? data.personagem : (this.game.meuPersonagem || 'solar');
-        this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
-        
-        this.pontosSolar = data ? (data.pontosSolar || 0) : 0;
-        this.pontosFornalha = data ? (data.pontosFornalha || 0) : 0;
-
-        console.log(`🛡️ [SEGURANÇA] Esta aba é rigorosamente o: ${this.personagemInicial.toUpperCase()}`);
-    }
-
     completouFase(jogador, teleportador) {
         if (this.jaEstaSaindo) return;
 
-        // O ponto vai SEMPRE para quem esta aba está a controlar, sem margem para bugs
         const quemMarcouPonto = this.personagemInicial; 
 
         const dadosTransicao = {
-            proximaCena: 'Mapa2', // (ou Mapa2 se estiveres no Game.js)
+            proximaCena: 'Mapa2',
             personagem: this.personagemInicial,
             pontosSolar: this.pontosSolar,
             pontosFornalha: this.pontosFornalha,

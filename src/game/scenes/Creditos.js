@@ -113,10 +113,10 @@ export class Creditos extends Scene {
         .setBlendMode(Phaser.BlendModes.ADD)
         .setDepth(150);
 
+    // CORRIGIDO: Renderiza a logo de forma opaca por cima do brilho
     if (this.textures.exists('logo_heatcore')) {
       this.logoHeader = this.add.image(width / 2, topoY, 'logo_heatcore')
           .setScale(0.52)
-          .setBlendMode(Phaser.BlendModes.SCREEN)
           .setDepth(151);
     } else {
       this.logoHeader = this.add.text(width / 2, topoY, "HEATCORE", {
@@ -152,7 +152,7 @@ export class Creditos extends Scene {
       },
       {
         titulo: "PROGRAMAÇÃO & GAMEPLAY",
-        nomes: ["[ GABRIEL FERREIRA DE SOUZA DA SILVA ]", "[ DANIEL ]"]
+        nomes: ["[ GABRIEL FERREIRA DE SOUZA DA SILVA ]", "[ DANIEL BENTES PERQUIM]"]
       },
       {
         titulo: "ARTE & ANIMAÇÃO 2D",
@@ -160,7 +160,7 @@ export class Creditos extends Scene {
       },
       {
         titulo: "DESIGN DE NÍVEIS (LEVEL DESIGN)",
-        nomes: ["[ DANIEL ]"]
+        nomes: ["[ DANIEL BENTES PERQUIM ]"]
       },
       {
         titulo: "ARQUITETURA MULTIPLAYER & REDE",
@@ -168,11 +168,11 @@ export class Creditos extends Scene {
       },
       {
         titulo: "MÚSICA & DESIGN DE SOM (SFX)",
-        nomes: ["[ DANIEL ]"]
+        nomes: ["[ DANIEL BENTES PERQUIM ]"]
       },
       {
         titulo: "GARANTIA DE QUALIDADE (QA & TESTES)",
-        nomes: ["[ GABRIEL FERREIRA DE SOUZA DA SILVA ]", "[ DANIEL ]"]
+        nomes: ["[ GABRIEL FERREIRA DE SOUZA DA SILVA ]", "[ DANIEL BENTES PERQUIM ]"]
       },
       {
         titulo: "TECNOLOGIAS UTILIZADAS",
@@ -231,7 +231,7 @@ export class Creditos extends Scene {
       return;
     }
 
-    const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+    const pad = this.input.gamepad ? (this.input.gamepad.pad1 || this.input.gamepad.getPad(0)) : null;
     if (pad && (pad.B || (pad.buttons.length > 1 && pad.buttons[1].pressed))) {
       this.voltarParaMenu();
       return;
@@ -240,7 +240,6 @@ export class Creditos extends Scene {
     const deltaSegundos = delta / 1000;
     this.containerCreditos.y -= this.velocidadeRolagem * deltaSegundos;
 
-    // Quando todos os créditos passarem do topo da máscara, retorna automaticamente ao MainMenu
     if (this.containerCreditos.y < this.limiteTopo - this.alturaTotalCreditos) {
       this.voltarParaMenu();
     }

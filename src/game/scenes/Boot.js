@@ -24,6 +24,8 @@ export class Boot extends Scene {
     this.add.rectangle(0, 0, 800, 600, 0x000000).setOrigin(0, 0);
     this.jaFoiProMenu = false;
     this.sistemaIniciado = false;
+    this.podePularBios = false;
+    this.podePularComControle = false;
 
     // ==========================================
     // 2. TELA DE ESPERA (DESBLOQUEIO DE ÁUDIO)
@@ -43,8 +45,8 @@ export class Boot extends Scene {
       repeat: -1
     });
 
-    // Função central para iniciar o sistema
-    const iniciarSistema = () => {
+    // Função central para ligar o sistema com apenas 1 toque
+    const ligarSistema = () => {
       if (this.sistemaIniciado) return;
       this.sistemaIniciado = true;
 
@@ -55,38 +57,45 @@ export class Boot extends Scene {
       }
 
       this.iniciarBios();
+
+      // Ativa a permissão para pular a BIOS após 250ms
+      this.time.delayedCall(250, () => {
+          this.podePularBios = true;
+      });
     };
 
-    // Ouvintes para Rato e Teclado
-    this.input.once("pointerdown", iniciarSistema);
-    this.input.keyboard.once("keydown", iniciarSistema);
+    this.ligarSistema = ligarSistema;
 
-    // Guardamos a função num apontador da cena para ser chamada pelo Gamepad no update()
-    this.iniciarSistemaCallback = iniciarSistema;
+    // Ouvintes diretos de clique único para Rato e Teclado
+    this.input.once("pointerdown", ligarSistema);
+    this.input.keyboard.once("keydown", ligarSistema);
   }
 
   update() {
-    // Se o sistema ainda não arrancou, verificamos se algum botão do Gamepad foi pressionado
-    if (!this.sistemaIniciado) {
-        const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
-        if (pad) {
-            // Percorre todos os botões do comando para ver se algum está a ser premido
-            const botaoPressionado = pad.buttons.some(button => button.pressed);
-            
-            // Ou se o analógico foi mexido significativamente
-            const analogicoMovido = Math.abs(pad.leftStick.x) > 0.3 || Math.abs(pad.leftStick.y) > 0.3;
+    if (this.jaFoiProMenu) return;
 
-            if (botaoPressionado || analogicoMovido) {
-                this.iniciarSistemaCallback();
-            }
+    // Verifica o estado do Gamepad (incluindo controles genéricos USB SNES)
+    const pad = this.input.gamepad ? (this.input.gamepad.pad1 || this.input.gamepad.getPad(0)) : null;
+    const padPressed = pad && (
+        pad.buttons.some(b => b && (b.pressed || b.value > 0.5)) ||
+        (pad.leftStick && (Math.abs(pad.leftStick.x) > 0.3 || Math.abs(pad.leftStick.y) > 0.3))
+    );
+
+    // 1. TELA INICIAL: Liga o sistema IMEDIATAMENTE no primeiro toque do controle
+    if (!this.sistemaIniciado) {
+        if (padPressed) {
+            this.ligarSistema();
         }
-        return; // Sai do update para não executar o resto enquanto estiver na tela de espera
+        return;
     }
 
-    // Lógica normal de pular a BIOS caso já tenha iniciado
-    const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
-    if (pad && !this.jaFoiProMenu) {
-        if (pad.A || (pad.buttons.length > 9 && pad.buttons[9].pressed)) {
+    // 2. TELA DA BIOS: Garante que o jogador SOLTOU o botão antes de aceitar um novo toque para pular
+    if (this.sistemaIniciado && !this.podePularComControle) {
+        if (!padPressed) {
+            this.podePularComControle = true; // Botão de ligar foi solto!
+        }
+    } else if (this.sistemaIniciado && this.podePularComControle && this.podePularBios) {
+        if (padPressed) {
             this.irParaPreloader();
         }
     }
@@ -174,8 +183,15 @@ export class Boot extends Scene {
       }
     });
 
-    this.input.once("pointerdown", () => this.irParaPreloader());
-    this.input.keyboard.once("keydown-ENTER", () => this.irParaPreloader());
+    // Permite pular a BIOS com novo clique ou tecla do teclado
+    this.time.delayedCall(250, () => {
+        this.input.on("pointerdown", () => {
+            if (this.podePularBios && !this.jaFoiProMenu) this.irParaPreloader();
+        });
+        this.input.keyboard.on("keydown", () => {
+            if (this.podePularBios && !this.jaFoiProMenu) this.irParaPreloader();
+        });
+    });
   }
 
   irParaPreloader() {

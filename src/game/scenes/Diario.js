@@ -8,7 +8,7 @@ export class Diario extends Scene {
     init(data) {
         this.offsetDias = data ? (data.offsetDias || 0) : 0;
         this.personagemInicial = data ? (data.personagem || 'solar') : 'solar';
-        this.modoDiario = data ? (data.modoDiario || 'PLATAFORMAS') : 'PLATAFORMAS'; // PLATAFORMAS | LABIRINTO
+        this.modoDiario = data ? (data.modoDiario || 'PLATAFORMAS') : 'PLATAFORMAS'; 
     }
 
     create() {
@@ -75,7 +75,6 @@ export class Diario extends Scene {
             this.somQueda = this.sound.add('som_queda');
         }
 
-        // Estilo e Textura dos blocos
         const BASE_TEXTURAS1 = 3;
         const ID_BLOCO_BRANCO = BASE_TEXTURAS1 + 17;
         const ID_BLOCO_PRETO  = BASE_TEXTURAS1 + 38;
@@ -85,7 +84,6 @@ export class Diario extends Scene {
         const larg = map.width;
         const alt = map.height;
 
-        // Limpeza total do mapa
         for (let x = 0; x < larg; x++) {
             for (let y = 0; y < alt; y++) {
                 layerLimites.removeTileAt(x, y);
@@ -113,21 +111,18 @@ export class Diario extends Scene {
             ySolar = Math.floor(randomDiario() * (alt - 20)) + 10;
             yFornalha = Math.floor(randomDiario() * (alt - 20)) + 10;
 
-            // Corredor Solar
             for (let x = 1; x <= 10; x++) {
                 layerLimites.putTileAt(COR_MAPA_HOJE, x, ySolar); 
                 layerLimites.putTileAt(COR_MAPA_HOJE, x, ySolar - 6); 
             }
             for (let y = ySolar - 5; y < ySolar; y++) layerLimites.putTileAt(COR_MAPA_HOJE, 1, y);
 
-            // Corredor Fornalha
             for (let x = larg - 11; x < larg - 1; x++) {
                 layerLimites.putTileAt(COR_MAPA_HOJE, x, yFornalha); 
                 layerLimites.putTileAt(COR_MAPA_HOJE, x, yFornalha - 6); 
             }
             for (let y = yFornalha - 5; y < yFornalha; y++) layerLimites.putTileAt(COR_MAPA_HOJE, larg - 2, y);
 
-            // Abismo e Plataformas Flutuantes
             let startX = 12;
             let endX = larg - 13;
             let totalPassos = endX - startX;
@@ -257,22 +252,38 @@ export class Diario extends Scene {
         const teleporter2 = this.teleporters.create((larg - 4) * TW, (yFornalha - 1) * TH, 'corredorDireito').setVisible(false);
 
         // ==========================================
-        // INTERFACE DA MÁQUINA DO TEMPO & HUD DE MODO
+        // 4. MODO ESCURO DINÂMICO (HOLOFOTE NO PERSONAGEM)
+        // ==========================================
+        this.escuroAtivo = false;
+        
+        // Render Texture cobrindo a viewport inteira
+        this.overlayEscuro = this.add.renderTexture(0, 0, this.scale.width, this.scale.height)
+            .setOrigin(0, 0)
+            .setScrollFactor(0)
+            .setDepth(150)
+            .setVisible(false);
+
+        // Forma geométrica utilizada para recortar o buraco de luz
+        this.luzSpotlight = this.make.graphics({ add: false });
+        this.luzSpotlight.fillStyle(0xffffff, 1);
+        this.luzSpotlight.fillCircle(0, 0, 90); // Raio de visão de 90px em volta do jogador
+
+        // ==========================================
+        // HUD DA MÁQUINA DO TEMPO
         // ==========================================
         let stringData = dataSimulada.toLocaleDateString();
         let textoOffset = this.offsetDias === 0 ? "HOJE" : (this.offsetDias > 0 ? `+${this.offsetDias} DIA(S)` : `${this.offsetDias} DIA(S)`);
-        
-        let rotulosModos = {
-            'PLATAFORMAS': 'DESAFIO DE PLATAFORMAS',
-            'LABIRINTO':   'CORRIDA NO LABIRINTO'
-        };
 
         this.add.text(40, 25, `MAPA DIÁRIO: ${textoOffset} (${stringData})`, {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 16, color: "#ff9900", stroke: "#000000", strokeThickness: 3
         }).setScrollFactor(0).setDepth(200);
 
+        this.add.text(40, 48, "[E] MODO ESCURO | [+] PROX DIA | [-] DIA ANTERIOR | [ESC] MENU", {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa", stroke: "#000000", strokeThickness: 2
+        }).setScrollFactor(0).setDepth(200);
+
         // ==========================================
-        // 4. FÍSICAS, ANIMAÇÕES E CONTROLES
+        // 5. FÍSICAS E ANIMAÇÕES
         // ==========================================
         this.physics.add.collider(this.jogadorAtual, layerLimites);
         this.physics.add.collider(this.jogadorAtual, layerObjetos);
@@ -286,14 +297,43 @@ export class Diario extends Scene {
         this.configurarAnimacoes();
         
         this.cursors = this.input.keyboard.createCursorKeys();
-        this.teclaEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-        this.teclaMaisNum = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_ADD);
-        this.teclaMenosNum = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_SUBTRACT);
-        this.teclaMais = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.PLUS);
-        this.teclaIgual = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.EQUAL); 
-        this.teclaMenos = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.MINUS);
-        
         this.jaEstaSaindo = false;
+
+        // ==========================================
+        // 6. EVENTOS DE TECLADO (E, +, -, ESC)
+        // ==========================================
+        this.input.keyboard.on('keydown', (event) => {
+            if (this.jaEstaSaindo) return;
+
+            // Alternar escuro com 'E'
+            if (event.key === 'e' || event.key === 'E') {
+                this.escuroAtivo = !this.escuroAtivo;
+                this.overlayEscuro.setVisible(this.escuroAtivo);
+            }
+
+            // Próximo dia com '+' ou '='
+            if (event.key === '+' || event.key === '=' || event.code === 'NumpadAdd') {
+                this.scene.restart({ 
+                    offsetDias: this.offsetDias + 1, 
+                    personagem: this.personagemInicial, 
+                    modoDiario: this.modoDiario 
+                });
+            }
+
+            // Dia anterior com '-'
+            if (event.key === '-' || event.code === 'NumpadSubtract') {
+                this.scene.restart({ 
+                    offsetDias: this.offsetDias - 1, 
+                    personagem: this.personagemInicial, 
+                    modoDiario: this.modoDiario 
+                });
+            }
+
+            // Voltar ao menu com ESC
+            if (event.key === 'Escape') {
+                this.voltarParaMenu();
+            }
+        });
     }
 
     configurarAnimacoes() {
@@ -340,19 +380,27 @@ export class Diario extends Scene {
             });
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.teclaMaisNum) || Phaser.Input.Keyboard.JustDown(this.teclaMais) || Phaser.Input.Keyboard.JustDown(this.teclaIgual)) {
-            this.scene.restart({ offsetDias: this.offsetDias + 1, personagem: this.personagemInicial, modoDiario: this.modoDiario });
-            return;
-        }
-        if (Phaser.Input.Keyboard.JustDown(this.teclaMenosNum) || Phaser.Input.Keyboard.JustDown(this.teclaMenos)) {
-            this.scene.restart({ offsetDias: this.offsetDias - 1, personagem: this.personagemInicial, modoDiario: this.modoDiario });
-            return;
-        }
-        if (Phaser.Input.Keyboard.JustDown(this.teclaEsc)) {
-            this.voltarParaMenu();
-            return;
-        }
+        // ==========================================
+        // ESCURIDÃO COM FURO CIRCULAR
+        // ==========================================
+        const largura = 2500;
+        const altura = 2500;
+        const raioLuz = 24;
 
+        if (!this.textures.exists('escuridaoComFuro')) {
+            const canvasTexture = this.textures.createCanvas('escuridaoComFuro', largura, altura);
+            const ctx = canvasTexture.context;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+            ctx.fillRect(0, 0, largura, altura);
+
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.arc(largura / 2, altura / 2, raioLuz, 0, Math.PI * 2);
+            ctx.fill();
+
+            canvasTexture.refresh();
+        }
         const activePlayer = this.jogadorAtual;
         if (!activePlayer || !activePlayer.body || activePlayer.estaRenascendo) return;
 
@@ -374,14 +422,33 @@ export class Diario extends Scene {
         let tentouPular = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space) || this.apertouW.isDown;
         let estaCorrendo = this.apertouShift.isDown;
 
+        // ==========================================
+        // MAPEAMENTO DO CONTROLE SUPER NINTENDINHO
+        // ==========================================
         const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+
+        const isBtnPressed = (padObj, index) => {
+            if (!padObj || !padObj.buttons || !padObj.buttons[index]) return false;
+            return padObj.buttons[index].pressed || padObj.buttons[index].value > 0.5;
+        };
+
         if (pad) {
-            const axisX = pad.leftStick.x;
-            if (axisX < -0.2) indoEsquerda = true;
-            if (axisX > 0.2) indoDireita = true;
-            if (pad.A || (pad.buttons.length > 0 && pad.buttons[0].pressed)) tentouPular = true;
-            if (pad.R2 > 0.1 || (pad.buttons.length > 7 && pad.buttons[7].value > 0.1)) estaCorrendo = true;
-            if (pad.buttons.length > 8 && pad.buttons[8].pressed) {
+            const axisX = pad.leftStick ? pad.leftStick.x : 0;
+            if (axisX < -0.2 || pad.left || isBtnPressed(pad, 14)) indoEsquerda = true;
+            if (axisX > 0.2 || pad.right || isBtnPressed(pad, 15)) indoDireita = true;
+
+            // PULAR: Botão B (Amarelo / debaixo - index 0)
+            if (isBtnPressed(pad, 2)) {
+                tentouPular = true;
+            }
+
+            // CORRER: Botão RB / R (Gatilho de ombro direito - index 5)
+            if (isBtnPressed(pad, 6) || isBtnPressed(pad, 3)) {
+                estaCorrendo = true;
+            }
+
+            // VOLTAR AO MENU: Botão A (Vermelho / direita - index 1) ou SELECT (index 8)
+            if (isBtnPressed(pad, 1) || isBtnPressed(pad, 8)) {
                 this.voltarParaMenu();
                 return;
             }
