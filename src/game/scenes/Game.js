@@ -61,7 +61,7 @@ export class Game extends Scene {
         this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
 
         // ==========================================
-        // ESCURIDÃO COM FURO CIRCULAR
+        // ESCURIDÃO COM FURO CIRCULAR (MODO OTIMIZADO)
         // ==========================================
         const largura = 2500;
         const altura = 2500;
@@ -81,6 +81,9 @@ export class Game extends Scene {
 
             canvasTexture.refresh();
         }
+
+        this.escuroAtivo = false;
+        this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro').setDepth(150).setVisible(false);
 
         // ==========================================
         // 2. SPAWN DO PERSONAGEM LOCAL E REMOTO
@@ -158,10 +161,134 @@ export class Game extends Scene {
         }
 
         // ==========================================
-        // 5. CONTROLES
+        // 5. CONTROLES E EVENTOS NATIVOS
         // ==========================================
         this.cursors = this.input.keyboard.createCursorKeys();
         this.jaEstaSaindo = false;
+
+        this.input.keyboard.on('keydown', (event) => {
+            if (this.jaEstaSaindo) return;
+
+            if (event.key === 'e' || event.key === 'E') {
+                this.escuroAtivo = !this.escuroAtivo;
+                if (this.escuridaoSprite) {
+                    this.escuridaoSprite.setVisible(this.escuroAtivo);
+                }
+            }
+        });
+
+        // Adiciona a estética de monitor no final
+        this.adicionarFiltroVisao();
+    }
+
+    adicionarFiltroVisao() {
+        const sw = this.scale.width;
+        const sh = this.scale.height;
+        const uiContainer = this.add.container(0, 0).setScrollFactor(0).setDepth(190);
+
+        if (this.personagemInicial === 'solar') {
+            // --- VISÃO SOLAR (Futurista / Cyan / Paineis Solares) ---
+            if (!this.textures.exists('vinheta_solar')) {
+                const canvas = this.textures.createCanvas('vinheta_solar', sw, sh);
+                const ctx = canvas.context;
+                let grad = ctx.createRadialGradient(sw/2, sh/2, sh/4, sw/2, sh/2, sw/1.5);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, 'rgba(0, 243, 255, 0.12)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, sw, sh);
+                canvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'vinheta_solar').setOrigin(0,0));
+
+            // Grid Fotovoltaico do Painel Solar
+            if (!this.textures.exists('grid_solar')) {
+                const gridCanvas = this.textures.createCanvas('grid_solar', sw, sh);
+                const ctx = gridCanvas.context;
+                
+                // Linhas finas das células
+                ctx.strokeStyle = 'rgba(0, 243, 255, 0.03)';
+                ctx.lineWidth = 1;
+                for (let x = 0; x < sw; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sh); ctx.stroke(); }
+                for (let y = 0; y < sh; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sw, y); ctx.stroke(); }
+                
+                // Linhas grossas das placas divisórias
+                ctx.strokeStyle = 'rgba(0, 243, 255, 0.08)';
+                ctx.lineWidth = 2;
+                for (let x = 0; x < sw; x += 120) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sh); ctx.stroke(); }
+                for (let y = 0; y < sh; y += 120) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sw, y); ctx.stroke(); }
+                
+                gridCanvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'grid_solar').setOrigin(0,0));
+
+            let g = this.add.graphics();
+            g.lineStyle(2, 0x00f3ff, 0.5);
+            g.beginPath();
+            g.moveTo(20, 50); g.lineTo(20, 20); g.lineTo(50, 20);
+            g.moveTo(sw - 50, 20); g.lineTo(sw - 20, 20); g.lineTo(sw - 20, 50);
+            g.moveTo(20, sh - 50); g.lineTo(20, sh - 20); g.lineTo(50, sh - 20);
+            g.moveTo(sw - 50, sh - 20); g.lineTo(sw - 20, sh - 20); g.lineTo(sw - 20, sh - 50);
+            g.strokePath();
+
+            g.fillStyle(0x00f3ff, 0.4);
+            g.fillCircle(sw/2, 20, 2); g.fillCircle(sw/2, sh - 20, 2);
+            g.fillCircle(20, sh/2, 2); g.fillCircle(sw - 20, sh/2, 2);
+            uiContainer.add(g);
+
+        } else {
+            // --- VISÃO FORNALHA (Ferrugem / Amarelado / Retalho) ---
+            if (!this.textures.exists('vinheta_fornalha')) {
+                const canvas = this.textures.createCanvas('vinheta_fornalha', sw, sh);
+                const ctx = canvas.context;
+                let grad = ctx.createRadialGradient(sw/2, sh/2, sh/4, sw/2, sh/2, sw/1.5);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, 'rgba(210, 160, 0, 0.18)'); // Amarelo sutil
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, sw, sh);
+                canvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'vinheta_fornalha').setOrigin(0,0));
+
+            let g = this.add.graphics();
+
+            const drawScrap = (x, y, multX, multY) => {
+                g.fillStyle(0x2d170e, 0.9);
+                g.beginPath();
+                g.moveTo(x, y); g.lineTo(x + (120 * multX), y); g.lineTo(x, y + (120 * multY));
+                g.closePath(); g.fillPath();
+
+                g.fillStyle(0x4a1c11, 0.95);
+                g.beginPath();
+                g.moveTo(x, y); g.lineTo(x + (75 * multX), y); g.lineTo(x, y + (75 * multY));
+                g.closePath(); g.fillPath();
+
+                g.fillStyle(0x6b2b11, 1);
+                g.fillRect(multX > 0 ? x : x - 20, multY > 0 ? y : y - 90, 20, 90);
+                g.fillRect(multX > 0 ? x : x - 90, multY > 0 ? y : y - 20, 90, 20);
+
+                g.fillStyle(0x8a9294, 1);
+                g.fillCircle(x + (12 * multX), y + (12 * multY), 4);
+                g.fillCircle(x + (45 * multX), y + (10 * multY), 3);
+                g.fillCircle(x + (10 * multX), y + (45 * multY), 3);
+            };
+
+            drawScrap(0, 0, 1, 1);
+            drawScrap(sw, 0, -1, 1);
+            drawScrap(0, sh, 1, -1);
+            drawScrap(sw, sh, -1, -1);
+            uiContainer.add(g);
+
+            if (!this.textures.exists('scanlines_fornalha')) {
+                const scanCanvas = this.textures.createCanvas('scanlines_fornalha', sw, sh);
+                const ctx = scanCanvas.context;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                for (let y = 0; y < sh; y += 6) {
+                    ctx.fillRect(0, y, sw, 2);
+                }
+                scanCanvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'scanlines_fornalha').setOrigin(0,0).setAlpha(0.6));
+        }
     }
 
     update() {
@@ -169,6 +296,10 @@ export class Game extends Scene {
 
         const activePlayer = this.jogadorAtual;
         if (!activePlayer || !activePlayer.body) return;
+
+        if (this.escuroAtivo && this.escuridaoSprite) {
+            this.escuridaoSprite.setPosition(activePlayer.x, activePlayer.y);
+        }
 
         if (this.socket) {
             this.socket.emit('enviarPosicao', {
@@ -178,7 +309,6 @@ export class Game extends Scene {
         }
 
         const body = activePlayer.body;
-        this.apertouE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
         this.apertouW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
         this.apertouA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.apertouD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
@@ -189,9 +319,6 @@ export class Game extends Scene {
         let tentouPular = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space) || this.apertouW.isDown;
         let estaCorrendo = this.apertouShift.isDown;
 
-        // ==========================================
-        // MAPEAMENTO DO CONTROLE SUPER NINTENDINHO
-        // ==========================================
         const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
 
         const isBtnPressed = (padObj, index) => {
@@ -204,17 +331,9 @@ export class Game extends Scene {
             if (axisX < -0.2 || pad.left || isBtnPressed(pad, 14)) indoEsquerda = true;
             if (axisX > 0.2 || pad.right || isBtnPressed(pad, 15)) indoDireita = true;
 
-            // PULAR: Botão B (Amarelo / debaixo - index 0)
-            if (isBtnPressed(pad, 2)) {
-                tentouPular = true;
-            }
+            if (isBtnPressed(pad, 2) || isBtnPressed(pad, 0) || pad.A) tentouPular = true;
+            if (isBtnPressed(pad, 6) || isBtnPressed(pad, 3) || isBtnPressed(pad, 7) || (pad.R2 && pad.R2 > 0.1)) estaCorrendo = true;
 
-            // CORRER: Botão RB / R (Gatilho de ombro direito - index 5)
-            if (isBtnPressed(pad, 6) || isBtnPressed(pad, 3)) {
-                estaCorrendo = true;
-            }
-
-            // CANCELAR / VOLTAR: Botão A (Vermelho / direita - index 1) ou SELECT (index 8)
             if (isBtnPressed(pad, 1) || isBtnPressed(pad, 8)) {
                 if (this.scene.isActive('Game')) {
                     this.scene.stop('Game');
@@ -262,12 +381,6 @@ export class Game extends Scene {
                 activePlayer.anims.stop();
                 activePlayer.setTexture('solar_andando', 0); 
             }
-        }
-
-        if (this.escuridaoSprite && activePlayer) this.escuridaoSprite.setPosition(activePlayer.x, activePlayer.y);
-        
-        if (Phaser.Input.Keyboard.JustDown(this.apertouE)) {
-            this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro').setDepth(100);
         }
     }
 

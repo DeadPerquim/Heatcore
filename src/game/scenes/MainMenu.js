@@ -145,7 +145,7 @@ export class MainMenu extends Scene {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
     }).setAlpha(0.5).setDepth(20);
 
-    this.add.text(width - 30, height - 30, "HEATCORE v1.1.0 - CONTROLES SNES", {
+    this.add.text(width - 30, height - 30, "HEATCORE v1.1.0 - CONTROLES HÍBRIDOS", {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
     }).setOrigin(1, 1).setAlpha(0.5).setDepth(20);
 
@@ -1017,6 +1017,10 @@ export class MainMenu extends Scene {
     if (this.jaIniciou) return;
 
     this.inputCooldown -= delta;
+    
+    // ==========================================
+    // MAPEAMENTO HÍBRIDO (SNES + Xbox/PlayStation)
+    // ==========================================
     const pad = this.input.gamepad ? (this.input.gamepad.pad1 || this.input.gamepad.getPad(0)) : null;
 
     const isBtnPressed = (padObj, buttonIndex) => {
@@ -1049,7 +1053,9 @@ export class MainMenu extends Scene {
       if (axisX < -0.5 || (pad && pad.left) || isBtnPressed(pad, 14)) { alternarEsq = true; this.inputCooldown = 200; } 
       else if (axisX > 0.5 || (pad && pad.right) || isBtnPressed(pad, 15)) { alternarDir = true; this.inputCooldown = 200; }
       
-      if (isBtnPressed(pad, 0) || isBtnPressed(pad, 2)) { confirmar = true; }
+      // CONFIRMAR: Botão 0 (Moderno/Xbox A) ou 2 (SNES B)
+      if (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || (pad && pad.A)) { confirmar = true; }
+      // CANCELAR: Botão 1 (Moderno B ou SNES A)
       if (isBtnPressed(pad, 1)) { cancelar = true; }
 
       if (alternarEsq || alternarDir) {
@@ -1077,6 +1083,7 @@ export class MainMenu extends Scene {
     if (this.estadoMenu === "SUBMENU_DIARIO") {
       let cancelar = Phaser.Input.Keyboard.JustDown(this.keyEsc);
 
+      // CANCELAR: Botão 1 (Moderno B ou SNES A) ou 8 (Select)
       if (isBtnPressed(pad, 1) || isBtnPressed(pad, 8)) {
         cancelar = true;
       }
@@ -1095,7 +1102,8 @@ export class MainMenu extends Scene {
         if (axisY < -0.5 || (pad && pad.up) || isBtnPressed(pad, 12)) { moverCima = true; this.inputCooldown = 200; } 
         else if (axisY > 0.5 || (pad && pad.down) || isBtnPressed(pad, 13)) { moverBaixo = true; this.inputCooldown = 200; }
         
-        if (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || isBtnPressed(pad, 9)) {
+        // CONFIRMAR Híbrido
+        if (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || isBtnPressed(pad, 9) || (pad && pad.A)) {
           confirmar = true;
         }
 
@@ -1154,7 +1162,8 @@ export class MainMenu extends Scene {
           moverDir = true;
         }
         
-        if (isBtnPressed(pad, 2) || isBtnPressed(pad, 0) || isBtnPressed(pad, 3) || isBtnPressed(pad, 9)) {
+        // CONFIRMAR Híbrido
+        if (isBtnPressed(pad, 2) || isBtnPressed(pad, 0) || isBtnPressed(pad, 3) || isBtnPressed(pad, 9) || (pad && pad.A)) {
           confirmar = true;
         }
 
@@ -1205,7 +1214,9 @@ export class MainMenu extends Scene {
       if (axisY < -0.5 || (pad && pad.up) || isBtnPressed(pad, 12)) { moverCima = true; this.inputCooldown = 200; } 
       else if (axisY > 0.5 || (pad && pad.down) || isBtnPressed(pad, 13)) { moverBaixo = true; this.inputCooldown = 200; }
     }
-    if (this.inputCooldown <= 0 && (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || isBtnPressed(pad, 9))) {
+    
+    // CONFIRMAR Híbrido (Menu Principal)
+    if (this.inputCooldown <= 0 && (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || isBtnPressed(pad, 9) || (pad && pad.A))) {
       confirmar = true;
     }
 

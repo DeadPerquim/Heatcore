@@ -102,18 +102,17 @@ export class Creditos extends Scene {
     this.btnVoltar.on('pointerdown', () => this.voltarParaMenu());
 
     // ==========================================
-    // 3. IMAGEM DO TÍTULO FIXA NO TOPO (MÁXIMA PROFUNDIDADE)
+    // 3. IMAGEM DO TÍTULO FIXA NO TOPO
     // ==========================================
     const topoY = 85;
 
-    // Fundo escuro atrás do título para bloqueio visual adicional
-    this.add.rectangle(width / 2, topoY, width, 160, 0x080910, 0.95).setDepth(140);
+    // Fundo totalmente opaco (alpha 1) e um pouco mais alto para bloquear 100% o texto vazando
+    this.add.rectangle(width / 2, 80, width, 180, 0x080910, 1).setDepth(140);
 
     this.logoGlow = this.add.circle(width / 2, topoY, 95, 0xff6600, 0.22)
         .setBlendMode(Phaser.BlendModes.ADD)
         .setDepth(150);
 
-    // CORRIGIDO: Renderiza a logo de forma opaca por cima do brilho
     if (this.textures.exists('logo_heatcore')) {
       this.logoHeader = this.add.image(width / 2, topoY, 'logo_heatcore')
           .setScale(0.52)
@@ -132,11 +131,11 @@ export class Creditos extends Scene {
     // ==========================================
     // 4. CRÉDITOS ROLANTES COM MÁSCARA ISOLADA
     // ==========================================
-    this.limiteTopo = 160; 
+    this.limiteTopo = 165; // Máscara começa exatamente abaixo da linha divisória
     const limiteRodape = height - 50; 
     const alturaJanela = limiteRodape - this.limiteTopo;
 
-    // Máscara Geométrica embutida
+    // Máscara Geométrica
     const maskGraphics = this.make.graphics({ add: false });
     maskGraphics.fillStyle(0xffffff);
     maskGraphics.fillRect(0, this.limiteTopo, width, alturaJanela);
@@ -152,7 +151,7 @@ export class Creditos extends Scene {
       },
       {
         titulo: "PROGRAMAÇÃO & GAMEPLAY",
-        nomes: ["[ GABRIEL FERREIRA DE SOUZA DA SILVA ]", "[ DANIEL BENTES PERQUIM]"]
+        nomes: ["[ GABRIEL FERREIRA DE SOUZA DA SILVA ]", "[ DANIEL BENTES PERQUIM ]"]
       },
       {
         titulo: "ARTE & ANIMAÇÃO 2D",
@@ -217,7 +216,9 @@ export class Creditos extends Scene {
     });
 
     this.alturaTotalCreditos = offsetY;
-    this.velocidadeRolagem = 42;
+    
+    // Velocidade bastante reduzida para leitura confortável
+    this.velocidadeRolagem = 25;
 
     this.teclaEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.jaSaindo = false;
@@ -240,7 +241,8 @@ export class Creditos extends Scene {
     const deltaSegundos = delta / 1000;
     this.containerCreditos.y -= this.velocidadeRolagem * deltaSegundos;
 
-    if (this.containerCreditos.y < this.limiteTopo - this.alturaTotalCreditos) {
+    // Subtrai 150 pixels extras (~6 segundos adicionais na velocidade 25) antes de fechar
+    if (this.containerCreditos.y < this.limiteTopo - this.alturaTotalCreditos - 150) {
       this.voltarParaMenu();
     }
   }
