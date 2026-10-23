@@ -8,7 +8,7 @@ export class Diario extends Scene {
     init(data) {
         this.offsetDias = data ? (data.offsetDias || 0) : 0;
         this.personagemInicial = data ? (data.personagem || 'solar') : 'solar';
-        this.modoDiario = data ? (data.modoDiario || 'PLATAFORMAS') : 'PLATAFORMAS'; // PLATAFORMAS | LABIRINTO
+        this.modoDiario = data ? (data.modoDiario || 'PLATAFORMAS') : 'PLATAFORMAS'; 
     }
 
     create() {
@@ -75,7 +75,6 @@ export class Diario extends Scene {
             this.somQueda = this.sound.add('som_queda');
         }
 
-        // Estilo e Textura dos blocos
         const BASE_TEXTURAS1 = 3;
         const ID_BLOCO_BRANCO = BASE_TEXTURAS1 + 17;
         const ID_BLOCO_PRETO  = BASE_TEXTURAS1 + 38;
@@ -85,7 +84,6 @@ export class Diario extends Scene {
         const larg = map.width;
         const alt = map.height;
 
-        // Limpeza total do mapa
         for (let x = 0; x < larg; x++) {
             for (let y = 0; y < alt; y++) {
                 layerLimites.removeTileAt(x, y);
@@ -113,21 +111,18 @@ export class Diario extends Scene {
             ySolar = Math.floor(randomDiario() * (alt - 20)) + 10;
             yFornalha = Math.floor(randomDiario() * (alt - 20)) + 10;
 
-            // Corredor Solar
             for (let x = 1; x <= 10; x++) {
                 layerLimites.putTileAt(COR_MAPA_HOJE, x, ySolar); 
                 layerLimites.putTileAt(COR_MAPA_HOJE, x, ySolar - 6); 
             }
             for (let y = ySolar - 5; y < ySolar; y++) layerLimites.putTileAt(COR_MAPA_HOJE, 1, y);
 
-            // Corredor Fornalha
             for (let x = larg - 11; x < larg - 1; x++) {
                 layerLimites.putTileAt(COR_MAPA_HOJE, x, yFornalha); 
                 layerLimites.putTileAt(COR_MAPA_HOJE, x, yFornalha - 6); 
             }
             for (let y = yFornalha - 5; y < yFornalha; y++) layerLimites.putTileAt(COR_MAPA_HOJE, larg - 2, y);
 
-            // Abismo e Plataformas Flutuantes
             let startX = 12;
             let endX = larg - 13;
             let totalPassos = endX - startX;
@@ -257,22 +252,42 @@ export class Diario extends Scene {
         const teleporter2 = this.teleporters.create((larg - 4) * TW, (yFornalha - 1) * TH, 'corredorDireito').setVisible(false);
 
         // ==========================================
-        // INTERFACE DA MÁQUINA DO TEMPO & HUD DE MODO
+        // 4. MODO ESCURO COM CANVAS (IGUAL AO GAME E MAPA2)
+        // ==========================================
+        const larguraEscuro = 2500;
+        const alturaEscuro = 2500;
+        const raioLuz = 24;
+
+        if (!this.textures.exists('escuridaoComFuro')) {
+            const canvasTexture = this.textures.createCanvas('escuridaoComFuro', larguraEscuro, alturaEscuro);
+            const ctx = canvasTexture.context;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+            ctx.fillRect(0, 0, larguraEscuro, alturaEscuro);
+
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.arc(larguraEscuro / 2, alturaEscuro / 2, raioLuz, 0, Math.PI * 2);
+            ctx.fill();
+
+            canvasTexture.refresh();
+        }
+        
+        this.escuroAtivo = false;
+        this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro').setDepth(150).setVisible(false);
+
+        // ==========================================
+        // HUD DA MÁQUINA DO TEMPO
         // ==========================================
         let stringData = dataSimulada.toLocaleDateString();
         let textoOffset = this.offsetDias === 0 ? "HOJE" : (this.offsetDias > 0 ? `+${this.offsetDias} DIA(S)` : `${this.offsetDias} DIA(S)`);
-        
-        let rotulosModos = {
-            'PLATAFORMAS': 'DESAFIO DE PLATAFORMAS',
-            'LABIRINTO':   'CORRIDA NO LABIRINTO'
-        };
 
         this.add.text(40, 25, `MAPA DIÁRIO: ${textoOffset} (${stringData})`, {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 16, color: "#ff9900", stroke: "#000000", strokeThickness: 3
         }).setScrollFactor(0).setDepth(200);
 
         // ==========================================
-        // 4. FÍSICAS, ANIMAÇÕES E CONTROLES
+        // 5. FÍSICAS E ANIMAÇÕES
         // ==========================================
         this.physics.add.collider(this.jogadorAtual, layerLimites);
         this.physics.add.collider(this.jogadorAtual, layerObjetos);
@@ -286,14 +301,144 @@ export class Diario extends Scene {
         this.configurarAnimacoes();
         
         this.cursors = this.input.keyboard.createCursorKeys();
-        this.teclaEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-        this.teclaMaisNum = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_ADD);
-        this.teclaMenosNum = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_SUBTRACT);
-        this.teclaMais = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.PLUS);
-        this.teclaIgual = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.EQUAL); 
-        this.teclaMenos = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.MINUS);
-        
         this.jaEstaSaindo = false;
+
+        // ==========================================
+        // 6. EVENTOS DE TECLADO NATIVOS (+, -, E, ESC)
+        // ==========================================
+        this.input.keyboard.on('keydown', (event) => {
+            if (this.jaEstaSaindo) return;
+
+            if (event.key === 'e' || event.key === 'E') {
+                this.escuroAtivo = !this.escuroAtivo;
+                if (this.escuridaoSprite) {
+                    this.escuridaoSprite.setVisible(this.escuroAtivo);
+                }
+            }
+
+            if (event.key === '+' || event.key === '=' || event.code === 'NumpadAdd') {
+                this.scene.restart({ offsetDias: this.offsetDias + 1, personagem: this.personagemInicial, modoDiario: this.modoDiario });
+            }
+            if (event.key === '-' || event.code === 'NumpadSubtract') {
+                this.scene.restart({ offsetDias: this.offsetDias - 1, personagem: this.personagemInicial, modoDiario: this.modoDiario });
+            }
+            if (event.key === 'Escape') {
+                this.voltarParaMenu();
+            }
+        });
+
+        // Adiciona a estética de monitor no final
+        this.adicionarFiltroVisao();
+    }
+
+    adicionarFiltroVisao() {
+        const sw = this.scale.width;
+        const sh = this.scale.height;
+        const uiContainer = this.add.container(0, 0).setScrollFactor(0).setDepth(190);
+
+        if (this.personagemInicial === 'solar') {
+            // --- VISÃO SOLAR (Futurista / Cyan / Paineis Solares) ---
+            if (!this.textures.exists('vinheta_solar')) {
+                const canvas = this.textures.createCanvas('vinheta_solar', sw, sh);
+                const ctx = canvas.context;
+                let grad = ctx.createRadialGradient(sw/2, sh/2, sh/4, sw/2, sh/2, sw/1.5);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, 'rgba(0, 243, 255, 0.12)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, sw, sh);
+                canvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'vinheta_solar').setOrigin(0,0));
+
+            // Grid Fotovoltaico do Painel Solar
+            if (!this.textures.exists('grid_solar')) {
+                const gridCanvas = this.textures.createCanvas('grid_solar', sw, sh);
+                const ctx = gridCanvas.context;
+                
+                // Linhas finas das células
+                ctx.strokeStyle = 'rgba(0, 243, 255, 0.03)';
+                ctx.lineWidth = 1;
+                for (let x = 0; x < sw; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sh); ctx.stroke(); }
+                for (let y = 0; y < sh; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sw, y); ctx.stroke(); }
+                
+                // Linhas grossas das placas divisórias
+                ctx.strokeStyle = 'rgba(0, 243, 255, 0.08)';
+                ctx.lineWidth = 2;
+                for (let x = 0; x < sw; x += 120) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sh); ctx.stroke(); }
+                for (let y = 0; y < sh; y += 120) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sw, y); ctx.stroke(); }
+                
+                gridCanvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'grid_solar').setOrigin(0,0));
+
+            let g = this.add.graphics();
+            g.lineStyle(2, 0x00f3ff, 0.5);
+            g.beginPath();
+            g.moveTo(20, 50); g.lineTo(20, 20); g.lineTo(50, 20);
+            g.moveTo(sw - 50, 20); g.lineTo(sw - 20, 20); g.lineTo(sw - 20, 50);
+            g.moveTo(20, sh - 50); g.lineTo(20, sh - 20); g.lineTo(50, sh - 20);
+            g.moveTo(sw - 50, sh - 20); g.lineTo(sw - 20, sh - 20); g.lineTo(sw - 20, sh - 50);
+            g.strokePath();
+
+            g.fillStyle(0x00f3ff, 0.4);
+            g.fillCircle(sw/2, 20, 2); g.fillCircle(sw/2, sh - 20, 2);
+            g.fillCircle(20, sh/2, 2); g.fillCircle(sw - 20, sh/2, 2);
+            uiContainer.add(g);
+
+        } else {
+            // --- VISÃO FORNALHA (Ferrugem / Amarelado / Retalho) ---
+            if (!this.textures.exists('vinheta_fornalha')) {
+                const canvas = this.textures.createCanvas('vinheta_fornalha', sw, sh);
+                const ctx = canvas.context;
+                let grad = ctx.createRadialGradient(sw/2, sh/2, sh/4, sw/2, sh/2, sw/1.5);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, 'rgba(210, 160, 0, 0.18)'); 
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, sw, sh);
+                canvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'vinheta_fornalha').setOrigin(0,0));
+
+            let g = this.add.graphics();
+
+            const drawScrap = (x, y, multX, multY) => {
+                g.fillStyle(0x2d170e, 0.9);
+                g.beginPath();
+                g.moveTo(x, y); g.lineTo(x + (120 * multX), y); g.lineTo(x, y + (120 * multY));
+                g.closePath(); g.fillPath();
+
+                g.fillStyle(0x4a1c11, 0.95);
+                g.beginPath();
+                g.moveTo(x, y); g.lineTo(x + (75 * multX), y); g.lineTo(x, y + (75 * multY));
+                g.closePath(); g.fillPath();
+
+                g.fillStyle(0x6b2b11, 1);
+                g.fillRect(multX > 0 ? x : x - 20, multY > 0 ? y : y - 90, 20, 90);
+                g.fillRect(multX > 0 ? x : x - 90, multY > 0 ? y : y - 20, 90, 20);
+
+                g.fillStyle(0x8a9294, 1);
+                g.fillCircle(x + (12 * multX), y + (12 * multY), 4);
+                g.fillCircle(x + (45 * multX), y + (10 * multY), 3);
+                g.fillCircle(x + (10 * multX), y + (45 * multY), 3);
+            };
+
+            drawScrap(0, 0, 1, 1);
+            drawScrap(sw, 0, -1, 1);
+            drawScrap(0, sh, 1, -1);
+            drawScrap(sw, sh, -1, -1);
+            uiContainer.add(g);
+
+            if (!this.textures.exists('scanlines_fornalha')) {
+                const scanCanvas = this.textures.createCanvas('scanlines_fornalha', sw, sh);
+                const ctx = scanCanvas.context;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                for (let y = 0; y < sh; y += 6) {
+                    ctx.fillRect(0, y, sw, 2);
+                }
+                scanCanvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'scanlines_fornalha').setOrigin(0,0).setAlpha(0.6));
+        }
     }
 
     configurarAnimacoes() {
@@ -340,21 +485,12 @@ export class Diario extends Scene {
             });
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.teclaMaisNum) || Phaser.Input.Keyboard.JustDown(this.teclaMais) || Phaser.Input.Keyboard.JustDown(this.teclaIgual)) {
-            this.scene.restart({ offsetDias: this.offsetDias + 1, personagem: this.personagemInicial, modoDiario: this.modoDiario });
-            return;
-        }
-        if (Phaser.Input.Keyboard.JustDown(this.teclaMenosNum) || Phaser.Input.Keyboard.JustDown(this.teclaMenos)) {
-            this.scene.restart({ offsetDias: this.offsetDias - 1, personagem: this.personagemInicial, modoDiario: this.modoDiario });
-            return;
-        }
-        if (Phaser.Input.Keyboard.JustDown(this.teclaEsc)) {
-            this.voltarParaMenu();
-            return;
-        }
-
         const activePlayer = this.jogadorAtual;
         if (!activePlayer || !activePlayer.body || activePlayer.estaRenascendo) return;
+
+        if (this.escuroAtivo && this.escuridaoSprite) {
+            this.escuridaoSprite.setPosition(activePlayer.x, activePlayer.y);
+        }
 
         if (this.socket) {
             this.socket.emit('enviarPosicao', {
@@ -375,13 +511,21 @@ export class Diario extends Scene {
         let estaCorrendo = this.apertouShift.isDown;
 
         const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+
+        const isBtnPressed = (padObj, index) => {
+            if (!padObj || !padObj.buttons || !padObj.buttons[index]) return false;
+            return padObj.buttons[index].pressed || padObj.buttons[index].value > 0.5;
+        };
+
         if (pad) {
-            const axisX = pad.leftStick.x;
-            if (axisX < -0.2) indoEsquerda = true;
-            if (axisX > 0.2) indoDireita = true;
-            if (pad.A || (pad.buttons.length > 0 && pad.buttons[0].pressed)) tentouPular = true;
-            if (pad.R2 > 0.1 || (pad.buttons.length > 7 && pad.buttons[7].value > 0.1)) estaCorrendo = true;
-            if (pad.buttons.length > 8 && pad.buttons[8].pressed) {
+            const axisX = pad.leftStick ? pad.leftStick.x : 0;
+            if (axisX < -0.2 || pad.left || isBtnPressed(pad, 14)) indoEsquerda = true;
+            if (axisX > 0.2 || pad.right || isBtnPressed(pad, 15)) indoDireita = true;
+
+            if (isBtnPressed(pad, 2) || isBtnPressed(pad, 0) || pad.A) tentouPular = true;
+            if (isBtnPressed(pad, 6) || isBtnPressed(pad, 3) || isBtnPressed(pad, 7) || (pad.R2 && pad.R2 > 0.1)) estaCorrendo = true;
+
+            if (isBtnPressed(pad, 1) || isBtnPressed(pad, 8)) {
                 this.voltarParaMenu();
                 return;
             }
@@ -466,11 +610,37 @@ export class Diario extends Scene {
 
         const containerVitoria = this.add.container(0, 0).setScrollFactor(0).setDepth(1000);
 
-        const fundo = this.add.rectangle(0, 0, width, height, 0x000000, 0.85).setOrigin(0, 0);
+        // ==========================================
+        // TELA DE VITÓRIA ESTILO TERMINAL / SISTEMA
+        // ==========================================
+        const corHex = this.personagemInicial === 'solar' ? 0x00f3ff : 0xff8800;
+        const corStr = this.personagemInicial === 'solar' ? "#00f3ff" : "#ff8800";
+
+        // Fundo Sólido Moderno
+        const fundo = this.add.rectangle(0, 0, width, height, 0x0a0a12, 0.95).setOrigin(0, 0);
         containerVitoria.add(fundo);
+
+        // Scanlines
+        let linhasTV = this.add.graphics();
+        linhasTV.fillStyle(0x000000, 0.4);
+        for(let i = 0; i < height; i += 4) linhasTV.fillRect(0, i, width, 2);
+        containerVitoria.add(linhasTV);
+
+        // Moldura Tecnológica da cor do vencedor
+        let moldura = this.add.graphics();
+        moldura.lineStyle(2, corHex, 0.6);
+        moldura.strokeRect(30, 30, width - 60, height - 60);
+        containerVitoria.add(moldura);
+
+        // Texto de Sistema / Terminal
+        const txtTerminal = this.add.text(45, 45, "HEATCORE_OS // DIARY_SIMULATION_COMPLETE\n> UPLINK ESTABLISHED...\n> WINNER IDENTIFIED:", {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: corStr, shadow: { offsetX: 0, offsetY: 0, color: corStr, blur: 4, fill: true }
+        });
+        containerVitoria.add(txtTerminal);
 
         const nomeVencedor = this.personagemInicial.toUpperCase();
 
+        // Extrai ou pega o sprite do vencedor
         let spriteVencedor;
         if (this.textures.exists('Personagens')) {
             const tex = this.textures.get('Personagens');
@@ -483,32 +653,47 @@ export class Diario extends Scene {
                 const frameX = (this.personagemInicial === 'solar') ? 0 : halfW;
                 tex.add(frameKey, 0, frameX, 0, halfW, h);
             }
-            spriteVencedor = this.add.image(width / 2, height / 2 - 50, 'Personagens', frameKey).setDisplaySize(140, 140);
+            spriteVencedor = this.add.image(width / 2, height / 2 - 30, 'Personagens', frameKey).setDisplaySize(140, 140);
         } else {
             const chaveSprite = this.personagemInicial === 'solar' ? 'solar_andando' : 'Fornalha';
-            spriteVencedor = this.add.sprite(width / 2, height / 2 - 50, chaveSprite, 0).setDisplaySize(140, 140);
+            spriteVencedor = this.add.sprite(width / 2, height / 2 - 30, chaveSprite, 0).setDisplaySize(140, 140);
         }
+
+        // Efeito de Cintilação Holográfica no Vencedor
+        spriteVencedor.setTint(corHex);
+        this.tweens.add({
+            targets: spriteVencedor,
+            alpha: { from: 0.7, to: 1 },
+            duration: 150,
+            yoyo: true,
+            repeat: -1
+        });
+        
         containerVitoria.add(spriteVencedor);
 
-        const textoVitoria = this.add.text(width / 2, height / 2 + 50, `${nomeVencedor} VENCEU!`, {
+        // Texto Principal de Vitória
+        const textoVitoria = this.add.text(width / 2, height / 2 + 70, `>> ${nomeVencedor} VENCEU <<`, {
             fontFamily: "'Courier New', Courier, monospace",
-            fontSize: 32,
-            color: "#00ff66",
+            fontSize: 28,
+            color: "#ffffff",
             fontStyle: "bold",
-            stroke: "#000000",
-            strokeThickness: 5
+            stroke: corStr,
+            strokeThickness: 4,
+            shadow: { offsetX: 0, offsetY: 0, color: corStr, blur: 8, fill: true }
         }).setOrigin(0.5);
         containerVitoria.add(textoVitoria);
 
+        // Animação de Pulsar
         this.tweens.add({
             targets: textoVitoria,
-            scale: { from: 0.8, to: 1.1 },
-            duration: 400,
+            scale: { from: 0.95, to: 1.05 },
+            duration: 600,
             yoyo: true,
-            ease: 'Back.easeOut'
+            repeat: -1,
+            ease: 'Sine.easeInOut'
         });
 
-        this.time.delayedCall(3000, () => {
+        this.time.delayedCall(3500, () => {
             this.executarTransicaoSaida();
         });
     }
