@@ -48,7 +48,7 @@ export class Mapa3 extends Scene {
         const tsPedras = map.addTilesetImage('TilesPedra', 'TilesPedra');
         const tsEspinhos = map.addTilesetImage('Espinhos', 'Espinhos');
 
-        const arrayTilesets = [tsFundo, tsPersonagens, tsTexturas, tsPedras, tsEspinhos];
+        const arrayTilesets = [tsFundo, tsPersonagens, tsTexturas, tsPedras, tsEspinhos].filter(ts => ts !== null);
 
         const layerPedras = map.createLayer('Pedras', arrayTilesets, 0, 0);
         const layerCenarioDeFundo = map.createLayer('CenarioDeFundo', arrayTilesets, 0, 0);
@@ -62,15 +62,16 @@ export class Mapa3 extends Scene {
 
         this.mapaAlturaTotal = map.heightInPixels;
 
-        layerLimites.setCollisionByExclusion([-1]);
-        layerObjetos.setCollisionByExclusion([-1]);
+        // VERIFICAÇÃO DEFENSIVA: Evita Uncaught TypeError se a camada for null
+        if (layerLimites) layerLimites.setCollisionByExclusion([-1]);
+        if (layerObjetos) layerObjetos.setCollisionByExclusion([-1]);
         
         // ⚙️ DESATIVA A COLISÃO DO CHÃO DO MUNDO PARA PERMITIR CAIR NO ABISMO
         this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.physics.world.setBoundsCollision(true, true, true, false);
 
         // ==========================================
-        // ESCURIDÃO COM FURO CIRCULAR
+        // ESCURIDÃO COM FURO CIRCULAR (MODO OTIMIZADO)
         // ==========================================
         const largura = 2500; 
         const altura = 2500;
@@ -91,12 +92,15 @@ export class Mapa3 extends Scene {
             canvasTexture.refresh();
         }
 
+        this.escuroAtivo = false;
+        this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro').setDepth(150).setVisible(false);
+
         // ==========================================
         // 2. SPAWN DO PERSONAGEM LOCAL E REMOTO
         // ==========================================
         const posicoesSpawn = {
-            solar: { x: 247.5, y: 370 },
-            fornalha: { x: 1100, y: 370 }
+            solar: { x: 247.5, y: 1100 },
+            fornalha: { x: 1050, y: 1100 }
         };
 
         const coordLocal = posicoesSpawn[this.personagemInicial];
@@ -132,14 +136,14 @@ export class Mapa3 extends Scene {
         // ==========================================
         this.teleporters = this.physics.add.staticGroup();
 
-        const teleporter1 = this.teleporters.create(210, 370, 'corredorEsquerdo').setVisible(false);
-        const teleporter2 = this.teleporters.create(1150, 370, 'corredorDireito').setVisible(false);
+        const teleporter1 = this.teleporters.create(210, 1090, 'corredorEsquerdo').setVisible(false);
+        const teleporter2 = this.teleporters.create(1090, 1090, 'corredorDireito').setVisible(false);
 
         // ==========================================
         // 3. COLISÕES E CÂMERA
         // ==========================================
-        this.physics.add.collider(this.jogadorAtual, layerLimites);
-        this.physics.add.collider(this.jogadorAtual, layerObjetos);
+        if (layerLimites) this.physics.add.collider(this.jogadorAtual, layerLimites);
+        if (layerObjetos) this.physics.add.collider(this.jogadorAtual, layerObjetos);
 
         const teleporterAlvo = this.personagemInicial === 'solar' ? teleporter2 : teleporter1;
         this.physics.add.overlap(this.jogadorAtual, teleporterAlvo, this.completouFase, null, this);
@@ -167,10 +171,133 @@ export class Mapa3 extends Scene {
         }
 
         // ==========================================
-        // 5. CONTROLES
+        // 5. CONTROLES E EVENTOS NATIVOS
         // ==========================================
         this.cursors = this.input.keyboard.createCursorKeys();
         this.jaEstaSaindo = false;
+
+        this.input.keyboard.on('keydown', (event) => {
+            if (this.jaEstaSaindo) return;
+
+            // Alternar modo escuro com a tecla E
+            if (event.key === 'e' || event.key === 'E') {
+                this.escuroAtivo = !this.escuroAtivo;
+                if (this.escuridaoSprite) {
+                    this.escuridaoSprite.setVisible(this.escuroAtivo);
+                }
+            }
+        });
+
+        // Adiciona a estética de monitor no final
+        this.adicionarFiltroVisao();
+    }
+
+    adicionarFiltroVisao() {
+        const sw = this.scale.width;
+        const sh = this.scale.height;
+        const uiContainer = this.add.container(0, 0).setScrollFactor(0).setDepth(190);
+
+        if (this.personagemInicial === 'solar') {
+            // --- VISÃO SOLAR (Futurista / Cyan / Paineis Solares) ---
+            if (!this.textures.exists('vinheta_solar')) {
+                const canvas = this.textures.createCanvas('vinheta_solar', sw, sh);
+                const ctx = canvas.context;
+                let grad = ctx.createRadialGradient(sw/2, sh/2, sh/4, sw/2, sh/2, sw/1.5);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, 'rgba(0, 243, 255, 0.12)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, sw, sh);
+                canvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'vinheta_solar').setOrigin(0,0));
+
+            // Grid Fotovoltaico do Painel Solar
+            if (!this.textures.exists('grid_solar')) {
+                const gridCanvas = this.textures.createCanvas('grid_solar', sw, sh);
+                const ctx = gridCanvas.context;
+                
+                ctx.strokeStyle = 'rgba(0, 243, 255, 0.03)';
+                ctx.lineWidth = 1;
+                for (let x = 0; x < sw; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sh); ctx.stroke(); }
+                for (let y = 0; y < sh; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sw, y); ctx.stroke(); }
+                
+                ctx.strokeStyle = 'rgba(0, 243, 255, 0.08)';
+                ctx.lineWidth = 2;
+                for (let x = 0; x < sw; x += 120) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sh); ctx.stroke(); }
+                for (let y = 0; y < sh; y += 120) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sw, y); ctx.stroke(); }
+                
+                gridCanvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'grid_solar').setOrigin(0,0));
+
+            let g = this.add.graphics();
+            g.lineStyle(2, 0x00f3ff, 0.5);
+            g.beginPath();
+            g.moveTo(20, 50); g.lineTo(20, 20); g.lineTo(50, 20);
+            g.moveTo(sw - 50, 20); g.lineTo(sw - 20, 20); g.lineTo(sw - 20, 50);
+            g.moveTo(20, sh - 50); g.lineTo(20, sh - 20); g.lineTo(50, sh - 20);
+            g.moveTo(sw - 50, sh - 20); g.lineTo(sw - 20, sh - 20); g.lineTo(sw - 20, sh - 50);
+            g.strokePath();
+
+            g.fillStyle(0x00f3ff, 0.4);
+            g.fillCircle(sw/2, 20, 2); g.fillCircle(sw/2, sh - 20, 2);
+            g.fillCircle(20, sh/2, 2); g.fillCircle(sw - 20, sh/2, 2);
+            uiContainer.add(g);
+
+        } else {
+            // --- VISÃO FORNALHA (Ferrugem / Amarelado / Retalho) ---
+            if (!this.textures.exists('vinheta_fornalha')) {
+                const canvas = this.textures.createCanvas('vinheta_fornalha', sw, sh);
+                const ctx = canvas.context;
+                let grad = ctx.createRadialGradient(sw/2, sh/2, sh/4, sw/2, sh/2, sw/1.5);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, 'rgba(210, 160, 0, 0.18)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, sw, sh);
+                canvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'vinheta_fornalha').setOrigin(0,0));
+
+            let g = this.add.graphics();
+
+            const drawScrap = (x, y, multX, multY) => {
+                g.fillStyle(0x2d170e, 0.9);
+                g.beginPath();
+                g.moveTo(x, y); g.lineTo(x + (120 * multX), y); g.lineTo(x, y + (120 * multY));
+                g.closePath(); g.fillPath();
+
+                g.fillStyle(0x4a1c11, 0.95);
+                g.beginPath();
+                g.moveTo(x, y); g.lineTo(x + (75 * multX), y); g.lineTo(x, y + (75 * multY));
+                g.closePath(); g.fillPath();
+
+                g.fillStyle(0x6b2b11, 1);
+                g.fillRect(multX > 0 ? x : x - 20, multY > 0 ? y : y - 90, 20, 90);
+                g.fillRect(multX > 0 ? x : x - 90, multY > 0 ? y : y - 20, 90, 20);
+
+                g.fillStyle(0x8a9294, 1);
+                g.fillCircle(x + (12 * multX), y + (12 * multY), 4);
+                g.fillCircle(x + (45 * multX), y + (10 * multY), 3);
+                g.fillCircle(x + (10 * multX), y + (45 * multY), 3);
+            };
+
+            drawScrap(0, 0, 1, 1);
+            drawScrap(sw, 0, -1, 1);
+            drawScrap(0, sh, 1, -1);
+            drawScrap(sw, sh, -1, -1);
+            uiContainer.add(g);
+
+            if (!this.textures.exists('scanlines_fornalha')) {
+                const scanCanvas = this.textures.createCanvas('scanlines_fornalha', sw, sh);
+                const ctx = scanCanvas.context;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                for (let y = 0; y < sh; y += 6) {
+                    ctx.fillRect(0, y, sw, 2);
+                }
+                scanCanvas.refresh();
+            }
+            uiContainer.add(this.add.image(0, 0, 'scanlines_fornalha').setOrigin(0,0).setAlpha(0.6));
+        }
     }
 
     update() {
@@ -213,6 +340,11 @@ export class Mapa3 extends Scene {
         const activePlayer = this.jogadorAtual;
         if (!activePlayer || !activePlayer.body || activePlayer.estaRenascendo) return;
 
+        // ATUALIZAÇÃO DA POSIÇÃO DO FURO DE LUZ
+        if (this.escuroAtivo && this.escuridaoSprite) {
+            this.escuridaoSprite.setPosition(activePlayer.x, activePlayer.y);
+        }
+
         // Envia a posição atual para o servidor
         if (this.socket) {
             this.socket.emit('enviarPosicao', {
@@ -222,7 +354,6 @@ export class Mapa3 extends Scene {
         }
 
         const body = activePlayer.body;
-        this.apertouE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
         this.apertouW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
         this.apertouA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.apertouD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
@@ -233,13 +364,39 @@ export class Mapa3 extends Scene {
         let tentouPular = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space) || this.apertouW.isDown;
         let estaCorrendo = this.apertouShift.isDown;
 
+        // ==========================================
+        // MAPEAMENTO HÍBRIDO (SNES + Xbox/PlayStation)
+        // ==========================================
         const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+
+        const isBtnPressed = (padObj, index) => {
+            if (!padObj || !padObj.buttons || !padObj.buttons[index]) return false;
+            return padObj.buttons[index].pressed || padObj.buttons[index].value > 0.5;
+        };
+
         if (pad) {
-            const axisX = pad.leftStick.x;
-            if (axisX < -0.2) indoEsquerda = true;
-            if (axisX > 0.2) indoDireita = true;
-            if (pad.A || (pad.buttons.length > 0 && pad.buttons[0].pressed)) tentouPular = true;
-            if (pad.R2 > 0.1 || (pad.buttons.length > 7 && pad.buttons[7].value > 0.1)) estaCorrendo = true;
+            const axisX = pad.leftStick ? pad.leftStick.x : 0;
+            if (axisX < -0.2 || pad.left || isBtnPressed(pad, 14)) indoEsquerda = true;
+            if (axisX > 0.2 || pad.right || isBtnPressed(pad, 15)) indoDireita = true;
+
+            // PULAR: SNES (index 2) OU Moderno A/Cross (index 0 / pad.A)
+            if (isBtnPressed(pad, 2) || isBtnPressed(pad, 0) || pad.A) {
+                tentouPular = true;
+            }
+
+            // CORRER: SNES (index 6, 3) OU Moderno RT/R2 (index 7 / pad.R2)
+            if (isBtnPressed(pad, 6) || isBtnPressed(pad, 3) || isBtnPressed(pad, 7) || (pad.R2 && pad.R2 > 0.1)) {
+                estaCorrendo = true;
+            }
+
+            // CANCELAR / VOLTAR: Botão B moderno ou A do SNES (index 1) ou SELECT (index 8)
+            if (isBtnPressed(pad, 1) || isBtnPressed(pad, 8)) {
+                if (this.scene.isActive('Mapa3')) {
+                    this.scene.stop('Mapa3');
+                    this.scene.start('MainMenu');
+                }
+                return;
+            }
         }
 
         const noChao = body.blocked.down || body.touching.down || body.onFloor();
@@ -281,12 +438,6 @@ export class Mapa3 extends Scene {
                 activePlayer.setTexture('solar_andando', 0); 
             }
         }
-
-        if (this.escuridaoSprite && activePlayer) this.escuridaoSprite.setPosition(activePlayer.x, activePlayer.y);
-        
-        if (Phaser.Input.Keyboard.JustDown(this.apertouE)) {
-            this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro').setDepth(100);
-        }
     }
 
     completouFase(jogador, teleportador) {
@@ -295,7 +446,7 @@ export class Mapa3 extends Scene {
         const quemMarcouPonto = this.personagemInicial; 
 
         const dadosTransicao = {
-            proximaCena: 'Mapa3',
+            proximaCena: 'Mapa4',
             personagem: this.personagemInicial,
             pontosSolar: this.pontosSolar,
             pontosFornalha: this.pontosFornalha,

@@ -11,9 +11,6 @@ export class Preloader extends Scene {
     const cX = width / 2;
     const cY = height / 2;
 
-    // ==========================================
-    // 1. FUNDO DO LABORATÓRIO MODERNO
-    // ==========================================
     if (!this.textures.exists('fundo_lab_pro')) {
       const bgCanvas = this.textures.createCanvas('fundo_lab_pro', width, height);
       if (bgCanvas) {
@@ -34,9 +31,6 @@ export class Preloader extends Scene {
     }
     this.add.image(0, 0, 'fundo_lab_pro').setOrigin(0, 0).setDepth(0);
 
-    // ==========================================
-    // 2. SCANLINES MODERNAS
-    // ==========================================
     let linhasTV = this.make.graphics({ add: false });
     linhasTV.fillStyle(0x000000, 0.15); 
     for (let i = 0; i < height; i += 4) {
@@ -45,29 +39,22 @@ export class Preloader extends Scene {
     linhasTV.generateTexture('scanlines_preload_mod', width, height);
     this.add.image(0, 0, 'scanlines_preload_mod').setOrigin(0, 0).setDepth(10);
 
-    // ==========================================
-    // 3. TÍTULO E UI DE CARREGAMENTO
-    // ==========================================
     this.add.text(cX, cY - 40, "SYS_LOADER // COMPILING ASSETS...", {
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 16,
-      color: "#00f3ff", // Cyan
+      color: "#00f3ff",
       shadow: { offsetX: 0, offsetY: 0, color: '#00f3ff', blur: 6, fill: true }
     }).setOrigin(0.5).setDepth(15);
 
-    // Moldura da barra de carregamento (fundo escuro, borda cyan)
     this.add.rectangle(cX, cY + 10, 468, 28, 0x141622).setStrokeStyle(2, 0x00f3ff).setDepth(15);
     
-    // Preenchimento da barra de progresso (Laranja Heatcore)
     const bar = this.add.rectangle(cX - 230, cY + 10, 4, 20, 0xff9900).setOrigin(0, 0.5).setDepth(15);
 
-    // Adicionando um brilho em torno da barra
     const glowBar = this.add.rectangle(cX - 230, cY + 10, 4, 20, 0xff9900, 0.5)
         .setOrigin(0, 0.5)
         .setBlendMode(Phaser.BlendModes.ADD)
         .setDepth(14);
 
-    // Porcentagem atual
     const textoPorcentagem = this.add.text(cX + 234, cY + 45, "0%", {
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 15,
@@ -75,16 +62,12 @@ export class Preloader extends Scene {
       fontStyle: "bold"
     }).setOrigin(1, 0.5).setDepth(15);
 
-    // Nome do arquivo atual sendo processado (detalhe imersivo)
     const textoArquivo = this.add.text(cX - 234, cY + 45, "Initializing protocols...", {
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 11,
       color: "#8888aa"
     }).setOrigin(0, 0.5).setDepth(15);
 
-    // ==========================================
-    // 4. EVENTOS DO LOAD
-    // ==========================================
     this.load.on("progress", (progress) => {
       let larguraAtual = 4 + 460 * progress;
       bar.width = larguraAtual;
@@ -102,36 +85,39 @@ export class Preloader extends Scene {
   }
 
   preload() {
-    // 1. CARREGAR OS MAPAS
-    this.load.tilemapTiledJSON('mapa', './assets/maps/_mapasdojogo/Mapa1.json');
-    this.load.tilemapTiledJSON('mapa2', './assets/maps/_mapasdojogo/Mapa2.json');
+    this.load.tilemapTiledJSON('mapa', 'assets/maps/_mapasdojogo/Mapa1.json');
+    this.load.tilemapTiledJSON('mapa2', 'assets/maps/_mapasdojogo/Mapa2.json');
+    this.load.tilemapTiledJSON('mapa3', 'assets/maps/_mapasdojogo/Mapa3.json');
 
-    // 2. IMAGENS DO CENÁRIO E INTERFACE
-    this.load.image('FundoMetal', './assets/sprites/background-images/FundoMetal.png');
-    this.load.image('Personagens', './assets/sprites/characters/Personagens.png');
-    this.load.image('Fornalha', './assets/sprites/characters/Fornalha.png');
-    this.load.image('texturas_tileset1', './assets/sprites/environment/texturas_tileset1.png');
-    this.load.image('TilesPedra', './assets/sprites/environment/TilesPedra.png');
-    this.load.image('Espinhos', './assets/sprites/environment/Espinhos.png');
-    this.load.image('logo_heatcore', './assets/logo_heatcore.png');
-    this.load.image('preview_solar', 'assets/personagens/preview_solar.png');
-    this.load.image('preview_fornalha', 'assets/personagens/preview_fornalha.png');
+    this.load.image('FundoMetal', 'assets/sprites/background-images/FundoMetal.png');
+    this.load.image('Personagens', 'assets/sprites/characters/Personagens.png');
+    this.load.image('Fornalha', 'assets/sprites/characters/Fornalha.png');
+    this.load.image('texturas_tileset1', 'assets/sprites/environment/texturas_tileset1.png');
+    this.load.image('TilesPedra', 'assets/sprites/environment/TilesPedra.png');
+    this.load.image('Espinhos', 'assets/sprites/environment/Espinhos.png');
+    this.load.image('logo_heatcore', 'assets/logo_heatcore.png');
 
-    // 3. SPRITESHEETS DO PERSONAGEM (Com chaves únicas)
-    this.load.spritesheet('solar_andando', './assets/sprites/characters/Solar/Andando.png', { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('solar_caindo', './assets/sprites/characters/Solar/Caindo.png', { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('solar_correndo', './assets/sprites/characters/Solar/Correndo.png', { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('solar_deslizando', './assets/sprites/characters/Solar/DeslizandoParede.png', { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('solar_pulando', './assets/sprites/characters/Solar/Pulando.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('solar_andando', 'assets/sprites/characters/Solar/Andando.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('solar_caindo', 'assets/sprites/characters/Solar/Caindo.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('solar_correndo', 'assets/sprites/characters/Solar/Correndo.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('solar_deslizando', 'assets/sprites/characters/Solar/DeslizandoParede.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('solar_pulando', 'assets/sprites/characters/Solar/Pulando.png', { frameWidth: 16, frameHeight: 16 });
 
-    // 4. ÁUDIO
-    this.load.audio('boot_pc', './assets/audio/sfx/Old_90s_PC_boot_sequence.wav');
-    this.load.audio('caindo', './assets/audio/sfx/caindo.wav');
-    this.load.audio('menu', './assets/audio/music/menu.wav');
+    this.load.audio('boot_pc', 'assets/audio/sfx/Old_90s_PC_boot_sequence.wav');
+    this.load.audio('caindo', 'assets/audio/sfx/caindo.wav');
+    this.load.audio('menu', 'assets/audio/music/menu.wav');
+
+    // Caminhos corretos para arquivos dentro da pasta public/assets/audio/sfx/menu/
+    this.load.audio('pc_ligando', 'assets/audio/sfx/menu/PCLigando.mp3');
+    this.load.audio('sfx_ponto1', 'assets/audio/sfx/menu/Pontos.mp3');
+    this.load.audio('sfx_ponto2', 'assets/audio/sfx/menu/Pontos2.mp3');
+    this.load.audio('sfx_ponto3', 'assets/audio/sfx/menu/Pontos3.mp3');
+
+    this.load.audio('sfx_mudar_opcao', 'assets/audio/sfx/menu/MudarOpções.mp3');
+    this.load.audio('sfx_clicar_botao', 'assets/audio/sfx/menu/ClicarBotão.mp3');
   }
 
   create() {
-    // Ao invés de cortar seco, adicionamos um leve "fade out" para conectar macio no MainMenu
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       this.scene.stop();

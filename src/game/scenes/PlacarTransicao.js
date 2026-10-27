@@ -5,15 +5,19 @@ export class PlacarTransicao extends Scene {
         super('PlacarTransicao');
     }
 
+    desbloquearAudio() {
+        if (this.sound && this.sound.context && this.sound.context.state === 'suspended') {
+            this.sound.context.resume().catch(() => {});
+        }
+    }
+
     init(data) {
-        // 🛡️ PRESERVA RESSALTADAMENTE A IDENTIDADE REAL DO JOGADOR LOCAL
         this.personagemInicial = this.game.meuPersonagem || (data && data.personagem) || 'solar';
         this.proximaCena = data ? (data.proximaCena || 'Mapa3') : 'Mapa3';
         this.pontosAntigosSolar = data ? (data.pontosSolar || 0) : 0;
         this.pontosAntigosFornalha = data ? (data.pontosFornalha || 0) : 0;
         this.quemMarcou = data ? (data.quemMarcou || 'solar') : 'solar';
 
-        // Incrementa o ponto corretamente para quem marcou
         this.pontosNovosSolar = this.pontosAntigosSolar + (this.quemMarcou === 'solar' ? 1 : 0);
         this.pontosNovosFornalha = this.pontosAntigosFornalha + (this.quemMarcou === 'fornalha' ? 1 : 0);
     }
@@ -23,8 +27,12 @@ export class PlacarTransicao extends Scene {
         const cX = width / 2;
         const cY = height / 2;
 
+        if (this.game.volumeSFX === undefined) this.game.volumeSFX = 0.7;
+
+        this.desbloquearAudio();
+
         // ==========================================
-        // 1. FUNDO DO LABORATÓRIO (Fallback caso não venha do Menu)
+        // 1. FUNDO DO LABORATÓRIO
         // ==========================================
         if (!this.textures.exists('fundo_lab_pro')) {
             const bgCanvas = this.textures.createCanvas('fundo_lab_pro', width, height);
@@ -41,7 +49,6 @@ export class PlacarTransicao extends Scene {
         }
         this.add.image(0, 0, 'fundo_lab_pro').setOrigin(0, 0).setDepth(0);
 
-        // Efeito de Tela / Scanlines (CRT Grid)
         let scanlines = this.add.graphics();
         scanlines.fillStyle(0x000000, 0.15);
         for (let y = 0; y < height; y += 4) {
@@ -65,7 +72,6 @@ export class PlacarTransicao extends Scene {
         // ==========================================
         const distCentro = 220;
 
-        // Container Base (Molduras)
         const bgSolar = this.add.rectangle(cX - distCentro, cY + 10, 180, 220, 0x141622)
             .setStrokeStyle(2, this.quemMarcou === 'solar' ? 0x00ff66 : 0x333345)
             .setDepth(20);
@@ -74,7 +80,6 @@ export class PlacarTransicao extends Scene {
             .setStrokeStyle(2, this.quemMarcou === 'fornalha' ? 0x00ff66 : 0x333345)
             .setDepth(20);
 
-        // Brilho na carta de quem fez o ponto
         if (this.quemMarcou === 'solar') {
             this.add.rectangle(cX - distCentro, cY + 10, 180, 220, 0x00ff66, 0.1).setDepth(21);
         } else if (this.quemMarcou === 'fornalha') {
@@ -110,7 +115,6 @@ export class PlacarTransicao extends Scene {
                 .setScale(2.5).setDepth(30);
         }
 
-        // Nomes nos Cards
         this.add.text(cX - distCentro, cY + 80, "SOLAR", {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 18, color: "#ff9900", fontStyle: "bold"
         }).setOrigin(0.5).setDepth(30);
@@ -133,19 +137,21 @@ export class PlacarTransicao extends Scene {
         }).setOrigin(0.5).setDepth(50);
 
         // ==========================================
-        // 6. EFEITO DE TELA CRT LIGANDO/DESLIGANDO
+        // 6. EFEITO CRT LIGANDO E SOM DE PC LIGANDO
         // ==========================================
         this.crtFundo = this.add.rectangle(cX, cY, width, height, 0x000000).setDepth(1000);
         this.crtLinha = this.add.rectangle(cX, cY, width, 4, 0xffffff).setDepth(1001).setScale(0, 1);
 
-        // Animação Ligar Monitor
+        if (this.cache.audio.exists('pc_ligando')) {
+            this.sound.play('pc_ligando', { volume: this.game.volumeSFX });
+        }
+
         this.tweens.add({
             targets: this.crtLinha,
             scaleX: 1,
             duration: 180,
             ease: 'Power2',
             onComplete: () => {
-                // Expande a linha revelando o cenário
                 this.tweens.add({
                     targets: this.crtLinha,
                     scaleY: height / 2,
@@ -163,11 +169,19 @@ export class PlacarTransicao extends Scene {
         });
 
         // ==========================================
-        // 7. ANIMAÇÃO DE +1 (FLUTUANDO)
+        // 7. ANIMAÇÃO DE +1 E SOM ALEATÓRIO DE PONTO
         // ==========================================
         this.time.delayedCall(1200, () => {
-            
-            // 7.1 Posição em cima do personagem que marcou
+            this.desbloquearAudio();
+
+            const listaSonsPonto = ['sfx_ponto1', 'sfx_ponto2', 'sfx_ponto3'];
+            const disponiveis = listaSonsPonto.filter(k => this.cache.audio.exists(k));
+
+            if (disponiveis.length > 0) {
+                const somSorteado = Phaser.Math.RND.pick(disponiveis);
+                this.sound.play(somSorteado, { volume: this.game.volumeSFX });
+            }
+
             let alvoX = this.quemMarcou === 'solar' ? cX - distCentro : cX + distCentro;
             let startY = cY - 100;
             
@@ -181,7 +195,6 @@ export class PlacarTransicao extends Scene {
                 shadow: { offsetX: 0, offsetY: 0, color: '#00ff66', blur: 10, fill: true }
             }).setOrigin(0.5).setDepth(100).setAlpha(0);
 
-            // Anima subindo e desaparecendo
             this.tweens.add({
                 targets: floatText,
                 y: startY - 60,
@@ -195,7 +208,6 @@ export class PlacarTransicao extends Scene {
                 }
             });
 
-            // 7.2 Atualiza e Pula o Placar Principal no meio da tela
             this.tweens.add({
                 targets: textoPlacar,
                 scale: { from: 1, to: 1.35 },
@@ -213,10 +225,8 @@ export class PlacarTransicao extends Scene {
         // 8. ANIMAÇÃO DE DESLIGAR MONITOR E MUDAR FASE
         // ==========================================
         this.time.delayedCall(4200, () => {
-            // Reseta a linha para fazer o reverso
             this.crtLinha.setScale(1, height / 2).setAlpha(0.8);
             
-            // Fundo volta a ficar preto (espremendo a tela)
             this.tweens.add({
                 targets: this.crtFundo,
                 alpha: 1,
@@ -224,21 +234,18 @@ export class PlacarTransicao extends Scene {
                 ease: 'Power2'
             });
 
-            // Linha encolhe verticalmente...
             this.tweens.add({
                 targets: this.crtLinha,
-                scaleY: 1, // Volta a ter a altura real de 4 pixels
+                scaleY: 1,
                 duration: 200,
                 ease: 'Power2',
                 onComplete: () => {
-                    // E depois encolhe horizontalmente (estilo TV antiga desligando)
                     this.tweens.add({
                         targets: this.crtLinha,
                         scaleX: 0,
                         duration: 180,
                         ease: 'Power2',
                         onComplete: () => {
-                            // Finalmente carrega a próxima fase
                             this.scene.start(this.proximaCena, {
                                 personagem: this.game.meuPersonagem || this.personagemInicial,
                                 pontosSolar: this.pontosNovosSolar,

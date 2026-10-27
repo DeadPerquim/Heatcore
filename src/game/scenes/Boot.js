@@ -6,18 +6,14 @@ export class Boot extends Scene {
   }
 
   preload() {
-    // Mantém o áudio original, pois o som mecânico/eletrônico ainda serve bem para dar "start"
+    // Caminho exato apontando para a pasta assets/audio/sfx/menu/
+    this.load.audio('pc_ligando', 'assets/audio/sfx/menu/PCLigando.mp3');
     this.load.audio('boot_pc', 'assets/audio/sfx/Old_90s_PC_boot_sequence.wav');
 
     let bgGraphics = this.make.graphics({ add: false });
     bgGraphics.fillStyle(0x2a2a35, 1);
     bgGraphics.fillRect(0, 0, 800, 600);
     bgGraphics.generateTexture('fundo_temporario', 800, 600);
-
-    let titleGraphics = this.make.graphics({ add: false });
-    titleGraphics.fillStyle(0xff5500, 1);
-    titleGraphics.fillRect(0, 0, 350, 120);
-    titleGraphics.generateTexture('titulo_temporario', 350, 120);
   }
 
   create() {
@@ -25,6 +21,8 @@ export class Boot extends Scene {
     const height = this.scale.height || 600;
     const cX = width / 2;
     const cY = height / 2;
+
+    if (this.game.volumeSFX === undefined) this.game.volumeSFX = 0.7;
 
     // ==========================================
     // 1. FUNDO DO LABORATÓRIO MODERNO
@@ -58,11 +56,27 @@ export class Boot extends Scene {
     this.sistemaIniciado = false;
     this.podePularBios = false;
     this.podePularComControle = false;
+    this.pcLigandoTocou = false;
+
+    // Função para tocar o som de ligar o PC de forma segura
+    const tocarPCLigando = () => {
+      if (!this.pcLigandoTocou && this.cache.audio.exists('pc_ligando')) {
+        this.pcLigandoTocou = true;
+        this.sound.play('pc_ligando', { volume: this.game.volumeSFX });
+      }
+    };
+
+    // Toca imediatamente ou no primeiro toque se o navegador tiver bloqueio de Autoplay
+    if (this.sound.locked) {
+      this.sound.once('unlocked', tocarPCLigando);
+    } else {
+      tocarPCLigando();
+    }
 
     // ==========================================
-    // 2. TELA DE ESPERA (DESBLOQUEIO DE ÁUDIO)
+    // 2. TELA DE ESPERA / STANDBY
     // ==========================================
-    let avisoTexto = this.add.text(cX, cY, "SYS_STANDBY // AWAITING ACTIVATION SIGNAL...", {
+    let avisoTexto = this.add.text(cX, cY - 15, "SYS_STANDBY // AWAITING ACTIVATION SIGNAL...", {
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 16,
       color: "#00f3ff",
@@ -70,9 +84,9 @@ export class Boot extends Scene {
       shadow: { offsetX: 0, offsetY: 0, color: '#00f3ff', blur: 8, fill: true } 
     }).setOrigin(0.5).setDepth(5);
 
-    let subTexto = this.add.text(cX, cY + 30, "[ PRESSIONE QUALQUER TECLA OU BOTÃO PARA INICIAR ]", {
+    let subTexto = this.add.text(cX, cY + 25, "[ PRESSIONE QUALQUER TECLA OU CLIQUE PARA INICIAR ]", {
         fontFamily: "'Courier New', Courier, monospace",
-        fontSize: 12,
+        fontSize: 13,
         color: "#8888aa",
         align: "center"
     }).setOrigin(0.5).setDepth(5);
@@ -86,33 +100,31 @@ export class Boot extends Scene {
     });
 
     // ==========================================
-    // 3. ANIMAÇÃO DE MONITOR LIGANDO AO CARREGAR
+    // 3. EFEITO CRT LIGANDO (RODA NA CARGA DA PÁGINA)
     // ==========================================
     this.crtFundo = this.add.rectangle(cX, cY, width, height, 0x000000).setDepth(1000);
     this.crtLinha = this.add.rectangle(cX, cY, width, 4, 0xffffff).setDepth(1001).setScale(0, 1);
 
-    // Expande no eixo X
     this.tweens.add({
-        targets: this.crtLinha,
-        scaleX: 1,
-        duration: 200,
-        ease: 'Power2',
-        onComplete: () => {
-            // Expande no eixo Y e revela o conteúdo por trás
-            this.tweens.add({
-                targets: this.crtLinha,
-                scaleY: height / 2,
-                alpha: 0,
-                duration: 250,
-                ease: 'Power2'
-            });
-            this.tweens.add({
-                targets: this.crtFundo,
-                alpha: 0,
-                duration: 250,
-                ease: 'Power2'
-            });
-        }
+      targets: this.crtLinha,
+      scaleX: 1,
+      duration: 180,
+      ease: 'Power2',
+      onComplete: () => {
+        this.tweens.add({
+          targets: this.crtLinha,
+          scaleY: height / 2,
+          alpha: 0,
+          duration: 250,
+          ease: 'Power2'
+        });
+        this.tweens.add({
+          targets: this.crtFundo,
+          alpha: 0,
+          duration: 250,
+          ease: 'Power2'
+        });
+      }
     });
 
     // ==========================================
@@ -122,24 +134,24 @@ export class Boot extends Scene {
       if (this.sistemaIniciado) return;
       this.sistemaIniciado = true;
 
+      tocarPCLigando();
+
       avisoTexto.destroy();
       subTexto.destroy();
 
       if (this.cache.audio.exists('boot_pc')) {
-          this.sound.play('boot_pc', { volume: 0.7 });
+        this.sound.play('boot_pc', { volume: 0.7 });
       }
 
       this.iniciarBios();
 
-      // Ativa a permissão para pular o boot moderno após 250ms
       this.time.delayedCall(250, () => {
-          this.podePularBios = true;
+        this.podePularBios = true;
       });
     };
 
     this.ligarSistema = ligarSistema;
 
-    // Ouvintes diretos de clique único para Rato e Teclado
     this.input.once("pointerdown", ligarSistema);
     this.input.keyboard.once("keydown", ligarSistema);
   }
@@ -147,14 +159,12 @@ export class Boot extends Scene {
   update() {
     if (this.jaFoiProMenu) return;
 
-    // Verifica o estado do Gamepad (incluindo controles genéricos USB SNES e XInput)
     const pad = this.input.gamepad ? (this.input.gamepad.pad1 || this.input.gamepad.getPad(0)) : null;
     const padPressed = pad && (
         pad.buttons.some(b => b && (b.pressed || b.value > 0.5)) ||
         (pad.leftStick && (Math.abs(pad.leftStick.x) > 0.3 || Math.abs(pad.leftStick.y) > 0.3))
     );
 
-    // 1. TELA INICIAL: Liga o sistema IMEDIATAMENTE no primeiro toque do controle
     if (!this.sistemaIniciado) {
         if (padPressed) {
             this.ligarSistema();
@@ -162,10 +172,9 @@ export class Boot extends Scene {
         return;
     }
 
-    // 2. TELA DA BIOS: Garante que o jogador SOLTOU o botão antes de aceitar um novo toque para pular
     if (this.sistemaIniciado && !this.podePularComControle) {
         if (!padPressed) {
-            this.podePularComControle = true; // Botão de ligar foi solto!
+            this.podePularComControle = true;
         }
     } else if (this.sistemaIniciado && this.podePularComControle && this.podePularBios) {
         if (padPressed) {
@@ -178,7 +187,6 @@ export class Boot extends Scene {
     const width = this.scale.width || 800;
     const height = this.scale.height || 600;
 
-    // Efeito sutil de scanlines modernas no HUD
     let linhasTV = this.make.graphics({ add: false });
     linhasTV.fillStyle(0x000000, 0.15); 
     for (let i = 0; i < height; i += 4) {
@@ -187,7 +195,6 @@ export class Boot extends Scene {
     linhasTV.generateTexture('scanlines_modernas', width, height);
     this.add.image(0, 0, 'scanlines_modernas').setOrigin(0, 0).setDepth(10);
 
-    // Cintilação Azul Cyan de Sistema
     let crtFlicker = this.add.rectangle(0, 0, width, height, 0x00f3ff, 0.02).setOrigin(0, 0).setDepth(11);
     this.tweens.add({
         targets: crtFlicker,
@@ -222,12 +229,11 @@ export class Boot extends Scene {
     let consoleText = this.add.text(40, 40, "", {
       fontFamily: "'Courier New', Courier, monospace", 
       fontSize: 16,
-      color: "#00f3ff", // Cor cyan moderna
+      color: "#00f3ff",
       align: "left",
       shadow: { offsetX: 0, offsetY: 0, color: '#00f3ff', blur: 6, fill: true } 
     }).setDepth(15);
 
-    // Efeito de "glitch" na posição X bem sutil
     this.time.addEvent({
         delay: 2000,
         loop: true,
@@ -243,7 +249,7 @@ export class Boot extends Scene {
     let textoAcumulado = "";
 
     this.time.addEvent({
-      delay: 110, // Um pouco mais rápido para parecer um sistema moderno rodando logs velozes
+      delay: 110,
       repeat: linhasDoTerminal.length - 1,
       callback: () => {
         if (this.jaFoiProMenu) return; 
@@ -262,7 +268,6 @@ export class Boot extends Scene {
       }
     });
 
-    // Permite pular o terminal com novo clique ou tecla do teclado
     this.time.delayedCall(250, () => {
         this.input.on("pointerdown", () => {
             if (this.podePularBios && !this.jaFoiProMenu) this.irParaPreloader();
@@ -281,7 +286,6 @@ export class Boot extends Scene {
         this.sound.stopByKey('boot_pc');
     } catch (e) {}
 
-    // Transição moderna de apagão rápido
     this.cameras.main.fadeOut(500, 0, 0, 0);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
         this.scene.stop("Boot");

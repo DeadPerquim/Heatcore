@@ -6,14 +6,61 @@ export class MainMenu extends Scene {
     super("MainMenu");
   }
 
+  // ==========================================
+  // FUNÇÕES AUXILIARES DE SOM
+  // ==========================================
+  desbloquearAudioNavegador() {
+    if (this.sound && this.sound.context && this.sound.context.state === 'suspended') {
+      this.sound.context.resume();
+    }
+  }
+
+  tocarSomMudarOpcao() {
+    this.desbloquearAudioNavegador();
+    if (this.cache.audio.exists('sfx_mudar_opcao')) {
+      const vol = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
+      this.sound.play('sfx_mudar_opcao', { volume: vol });
+    }
+  }
+
+  tocarSomBotaoCurto() {
+    this.desbloquearAudioNavegador();
+    if (this.cache.audio.exists('sfx_clicar_botao')) {
+      const vol = (this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7) * 0.5;
+      this.sound.play('sfx_clicar_botao', { volume: vol });
+    }
+  }
+
+  tocarSomSelecaoPersonagem() {
+    this.desbloquearAudioNavegador();
+    if (this.cache.audio.exists('sfx_clicar_botao')) {
+      const vol = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
+      this.sound.play('sfx_clicar_botao', { volume: vol });
+    }
+  }
+
   create() {
     const { width, height } = this.scale;
 
     // ==========================================
-    // 0. CONFIGURAÇÃO GLOBAL DE ÁUDIO
+    // 0. CONFIGURAÇÃO GLOBAL DE ÁUDIO & DESBLOQUEIO
     // ==========================================
     if (this.game.volumeMusica === undefined) this.game.volumeMusica = 0.5;
     if (this.game.volumeSFX === undefined) this.game.volumeSFX = 0.7;
+
+    // Garante que qualquer clique ou tecla destrave o áudio no navegador
+    this.input.on('pointerdown', () => this.desbloquearAudioNavegador());
+    this.input.keyboard.on('keydown', () => this.desbloquearAudioNavegador());
+
+    // Inicializa os ponteiros no índice 0 para não disparar som automático ao criar a cena
+    this.ultimoSelectedIndex = 0;
+    this.ultimoDiarioIndex = 0;
+    this.ultimoOpcoesIndex = 0;
+    this.ultimoOverlayIndex = 0;
+
+    // Diagnóstico no F12 Console para verificar carregamento
+    console.log("🔊 Status Áudio MudarOpção:", this.cache.audio.exists('sfx_mudar_opcao'));
+    console.log("🔊 Status Áudio ClicarBotão:", this.cache.audio.exists('sfx_clicar_botao'));
 
     // ==========================================
     // 0.1 CONEXÃO COM O SERVIDOR MULTIPLAYER
@@ -145,7 +192,7 @@ export class MainMenu extends Scene {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
     }).setAlpha(0.5).setDepth(20);
 
-    this.add.text(width - 30, height - 30, "HEATCORE v1.1.0 - CONTROLES HÍBRIDOS", {
+    this.add.text(width - 30, height - 30, "HEATCORE v1.2.0 - EFEITOS SONOROS", {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
     }).setOrigin(1, 1).setAlpha(0.5).setDepth(20);
 
@@ -238,6 +285,7 @@ export class MainMenu extends Scene {
 
       btnContainer.on('pointerdown', () => {
         if (!this.overlayAtivo && this.estadoMenu === "MAIN") {
+          this.tocarSomBotaoCurto();
           option.action();
         }
       });
@@ -317,6 +365,7 @@ export class MainMenu extends Scene {
 
       btnTxt.on('pointerdown', () => {
         if (this.estadoMenu === "SUBMENU_DIARIO") {
+          this.tocarSomBotaoCurto();
           this.confirmarOpcaoDiario();
         }
       });
@@ -332,6 +381,7 @@ export class MainMenu extends Scene {
     this.estadoMenu = "SUBMENU_DIARIO";
     this.inputCooldown = 250;
     this.diarioIndex = 0;
+    this.ultimoDiarioIndex = 0;
     this.atualizarSelecaoDiario();
 
     this.tweens.add({ targets: this.btnHighlightBg, alpha: 0, duration: 150 });
@@ -381,6 +431,11 @@ export class MainMenu extends Scene {
   }
 
   atualizarSelecaoDiario() {
+    if (this.ultimoDiarioIndex !== this.diarioIndex) {
+      this.tocarSomMudarOpcao();
+      this.ultimoDiarioIndex = this.diarioIndex;
+    }
+
     this.btnObjetosDiario.forEach((btn, index) => {
       const isSelected = index === this.diarioIndex;
       if (isSelected) {
@@ -451,6 +506,7 @@ export class MainMenu extends Scene {
     });
 
     this.btnVoltarOpcoes.on('pointerdown', () => {
+      this.tocarSomBotaoCurto();
       this.fecharOpcoes();
     });
 
@@ -574,6 +630,7 @@ export class MainMenu extends Scene {
     }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
 
     const acionarToggle = () => {
+      this.tocarSomBotaoCurto();
       this.opcoesIndex = 2;
       this.atualizarSelecaoOpcoes();
       onToggle();
@@ -641,6 +698,11 @@ export class MainMenu extends Scene {
   }
 
   atualizarSelecaoOpcoes() {
+    if (this.ultimoOpcoesIndex !== this.opcoesIndex) {
+      this.tocarSomMudarOpcao();
+      this.ultimoOpcoesIndex = this.opcoesIndex;
+    }
+
     this.sliderMusica.textoRotulo.setText(this.opcoesIndex === 0 ? "> MÚSICA" : "MÚSICA");
     this.sliderMusica.textoRotulo.setColor(this.opcoesIndex === 0 ? "#ff9900" : "#ffffff");
 
@@ -659,6 +721,7 @@ export class MainMenu extends Scene {
     this.estadoMenu = "OPTIONS";
     this.inputCooldown = 250;
     this.opcoesIndex = 0;
+    this.ultimoOpcoesIndex = 0;
     
     if (this.toggleFullscreen) {
       this.toggleFullscreen.atualizarVisual();
@@ -773,7 +836,10 @@ export class MainMenu extends Scene {
     this.btnCancelarOverlay.on('pointerout', () => this.btnCancelarOverlay.setColor("#ff4444"));
 
     this.btnCancelarOverlay.on('pointerdown', () => {
-      if (this.inputCooldown <= 0) this.fecharOverlay();
+      if (this.inputCooldown <= 0) {
+        this.tocarSomBotaoCurto();
+        this.fecharOverlay();
+      }
     });
 
     this.painelGroup.add([
@@ -885,6 +951,7 @@ export class MainMenu extends Scene {
     this.overlayAtivo = true;
     
     this.overlayIndex = this.personagensOcupados.solar ? 1 : 0;
+    this.ultimoOverlayIndex = this.overlayIndex;
     this.inputCooldown = 350; 
     
     this.overlayContainer.setVisible(true);
@@ -917,6 +984,11 @@ export class MainMenu extends Scene {
   }
 
   atualizarVisualOverlay() {
+    if (this.ultimoOverlayIndex !== this.overlayIndex) {
+      this.tocarSomMudarOpcao();
+      this.ultimoOverlayIndex = this.overlayIndex;
+    }
+
     if (this.personagensOcupados.solar) {
       this.cardSolar.bgCard.setStrokeStyle(2, 0x22222a).setFillStyle(0x0e0e14);
       this.cardSolar.scannerGlow.setVisible(false);
@@ -967,6 +1039,8 @@ export class MainMenu extends Scene {
   confirmarSelecao(personagemEscolhido) {
     if (this.jaIniciou) return;
     
+    this.tocarSomSelecaoPersonagem();
+
     this.game.meuPersonagem = personagemEscolhido;
     this.socket.emit('selecionarPersonagem', personagemEscolhido);
 
@@ -1053,9 +1127,7 @@ export class MainMenu extends Scene {
       if (axisX < -0.5 || (pad && pad.left) || isBtnPressed(pad, 14)) { alternarEsq = true; this.inputCooldown = 200; } 
       else if (axisX > 0.5 || (pad && pad.right) || isBtnPressed(pad, 15)) { alternarDir = true; this.inputCooldown = 200; }
       
-      // CONFIRMAR: Botão 0 (Moderno/Xbox A) ou 2 (SNES B)
       if (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || (pad && pad.A)) { confirmar = true; }
-      // CANCELAR: Botão 1 (Moderno B ou SNES A)
       if (isBtnPressed(pad, 1)) { cancelar = true; }
 
       if (alternarEsq || alternarDir) {
@@ -1074,6 +1146,7 @@ export class MainMenu extends Scene {
       }
 
       if (cancelar) {
+        this.tocarSomBotaoCurto();
         this.fecharOverlay();
       }
 
@@ -1083,12 +1156,12 @@ export class MainMenu extends Scene {
     if (this.estadoMenu === "SUBMENU_DIARIO") {
       let cancelar = Phaser.Input.Keyboard.JustDown(this.keyEsc);
 
-      // CANCELAR: Botão 1 (Moderno B ou SNES A) ou 8 (Select)
       if (isBtnPressed(pad, 1) || isBtnPressed(pad, 8)) {
         cancelar = true;
       }
 
       if (cancelar) {
+        this.tocarSomBotaoCurto();
         this.fecharSubmenuDiario();
         return;
       }
@@ -1102,7 +1175,6 @@ export class MainMenu extends Scene {
         if (axisY < -0.5 || (pad && pad.up) || isBtnPressed(pad, 12)) { moverCima = true; this.inputCooldown = 200; } 
         else if (axisY > 0.5 || (pad && pad.down) || isBtnPressed(pad, 13)) { moverBaixo = true; this.inputCooldown = 200; }
         
-        // CONFIRMAR Híbrido
         if (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || isBtnPressed(pad, 9) || (pad && pad.A)) {
           confirmar = true;
         }
@@ -1120,6 +1192,7 @@ export class MainMenu extends Scene {
         }
 
         if (confirmar) {
+          this.tocarSomBotaoCurto();
           this.confirmarOpcaoDiario();
         }
       }
@@ -1134,6 +1207,7 @@ export class MainMenu extends Scene {
       }
 
       if (cancelar) {
+        this.tocarSomBotaoCurto();
         this.fecharOpcoes();
         return;
       }
@@ -1162,7 +1236,6 @@ export class MainMenu extends Scene {
           moverDir = true;
         }
         
-        // CONFIRMAR Híbrido
         if (isBtnPressed(pad, 2) || isBtnPressed(pad, 0) || isBtnPressed(pad, 3) || isBtnPressed(pad, 9) || (pad && pad.A)) {
           confirmar = true;
         }
@@ -1195,10 +1268,12 @@ export class MainMenu extends Scene {
           }
         } else if (this.opcoesIndex === 2) {
           if (confirmar || moverEsq || moverDir) {
+            this.tocarSomBotaoCurto();
             this.alternarTelaCheia();
             this.inputCooldown = 250;
           }
         } else if (this.opcoesIndex === 3 && confirmar) {
+          this.tocarSomBotaoCurto();
           this.fecharOpcoes();
         }
       }
@@ -1215,7 +1290,6 @@ export class MainMenu extends Scene {
       else if (axisY > 0.5 || (pad && pad.down) || isBtnPressed(pad, 13)) { moverBaixo = true; this.inputCooldown = 200; }
     }
     
-    // CONFIRMAR Híbrido (Menu Principal)
     if (this.inputCooldown <= 0 && (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || isBtnPressed(pad, 9) || (pad && pad.A))) {
       confirmar = true;
     }
@@ -1233,11 +1307,17 @@ export class MainMenu extends Scene {
     }
 
     if (confirmar) {
+      this.tocarSomBotaoCurto();
       this.menuOptions[this.selectedIndex].action();
     }
   }
 
   atualizarSelecaoVisual() {
+    if (this.ultimoSelectedIndex !== this.selectedIndex) {
+      this.tocarSomMudarOpcao();
+      this.ultimoSelectedIndex = this.selectedIndex;
+    }
+
     this.btnObjects.forEach((btnObj, index) => {
       const isSelected = index === this.selectedIndex;
 
