@@ -16,6 +16,20 @@ export class Game extends Scene {
     }
 
     create() {
+        // =============== SISTEMA DE AMBIENTAÇÃO ===============
+        let somAmbiente = this.sound.get('ambientacao');
+        
+        // Se o som ainda não existe na memória, cria ele com loop ativado
+        if (!somAmbiente) {
+            somAmbiente = this.sound.add('ambientacao', { loop: true, volume: 0.8 }); 
+        }
+        
+        // Só dá o play se ele já não estiver tocando (garante a transição suave entre mapas)
+        if (!somAmbiente.isPlaying) {
+            somAmbiente.play();
+        }
+        // ======================================================
+
         this.cameras.main.fadeIn(600, 0, 0, 0);
 
         this.socket = this.game.socket;
@@ -79,7 +93,7 @@ export class Game extends Scene {
         };
 
         const coordLocal = posicoesSpawn[this.personagemInicial];
-        const chaveLocal = this.personagemInicial === 'solar' ? 'solar_andando' : 'Fornalha';
+        const chaveLocal = this.personagemInicial === 'solar' ? 'solar_andando' : 'fornalha_andando';
 
         this.jogadorAtual = this.physics.add.sprite(coordLocal.x, coordLocal.y, chaveLocal);
         this.jogadorAtual.setCircle(8).setCollideWorldBounds(true);
@@ -88,7 +102,7 @@ export class Game extends Scene {
         this.jogadorAtual.estaRenascendo = false;
 
         const coordOutro = posicoesSpawn[this.outroPersonagemTipo];
-        const chaveSpriteOutro = this.outroPersonagemTipo === 'solar' ? 'solar_andando' : 'Fornalha';
+        const chaveSpriteOutro = this.outroPersonagemTipo === 'solar' ? 'solar_andando' : 'fornalha_andando';
 
         this.outroSprite = this.add.sprite(coordOutro.x, coordOutro.y, chaveSpriteOutro).setAlpha(0.9).setDepth(50);
         this.outroSprite.setVisible(false);
@@ -129,11 +143,7 @@ export class Game extends Scene {
         this.cameras.main.startFollow(this.jogadorAtual);
         this.cameras.main.setZoom(1);
 
-        if (!this.anims.exists('walk')) this.anims.create({ key: 'walk', frames: this.anims.generateFrameNumbers('solar_andando', { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
-        if (!this.anims.exists('run')) this.anims.create({ key: 'run', frames: this.anims.generateFrameNumbers('solar_correndo', { start: 1, end: 2 }), frameRate: 15 });
-        if (!this.anims.exists('jump')) this.anims.create({ key: 'jump', frames: this.anims.generateFrameNumbers('solar_pulando', { start: 2, end: 2 }), frameRate: 100 });
-        if (!this.anims.exists('fall')) this.anims.create({ key: 'fall', frames: this.anims.generateFrameNumbers('solar_caindo', { start: 2, end: 2 }), frameRate: 10 });
-        if (!this.anims.exists('wallSlide')) this.anims.create({ key: 'wallSlide', frames: this.anims.generateFrameNumbers('solar_deslizando', { start: 1, end: 1 }), frameRate: 10 });
+        this.configurarAnimacoes();
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.jaEstaSaindo = false;
@@ -146,10 +156,45 @@ export class Game extends Scene {
             }
         });
 
-        // CONTAINER TRAVADO NA TELA (Sem se mover)
         this.uiContainer = this.add.container(0, 0).setDepth(190);
         this.uiContainer.setScrollFactor(0);
         this.adicionarFiltroVisao();
+
+        // Configuração dos áudios de movimento do jogador local
+        this.somAndando = this.sound.add('sfx_andando', { loop: true, volume: 0.25 });
+        this.somCorrendo = this.sound.add(this.personagemInicial === 'solar' ? 'sfx_correndo_solar' : 'sfx_correndo_fornalha', { loop: true, volume: 0.25 });
+        this.somPulando = this.sound.add('sfx_pulando', { volume: 0.4 });
+    }
+
+    pararSonsMovimento() {
+        if (this.somAndando) {
+            this.somAndando.stop();
+            this.somAndando.destroy();
+        }
+        if (this.somCorrendo) {
+            this.somCorrendo.stop();
+            this.somCorrendo.destroy();
+        }
+    }
+
+    configurarAnimacoes() {
+        const char = this.personagemInicial; // 'solar' ou 'fornalha'
+        
+        if (!this.anims.exists(`${char}_walk`)) {
+            this.anims.create({ key: `${char}_walk`, frames: this.anims.generateFrameNumbers(`${char}_andando`, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
+        }
+        if (!this.anims.exists(`${char}_run`)) {
+            this.anims.create({ key: `${char}_run`, frames: this.anims.generateFrameNumbers(`${char}_correndo`, { start: 1, end: 2 }), frameRate: 15 });
+        }
+        if (!this.anims.exists(`${char}_jump`)) {
+            this.anims.create({ key: `${char}_jump`, frames: this.anims.generateFrameNumbers(`${char}_pulando`, { start: 2, end: 2 }), frameRate: 100 });
+        }
+        if (!this.anims.exists(`${char}_fall`)) {
+            this.anims.create({ key: `${char}_fall`, frames: this.anims.generateFrameNumbers(`${char}_caindo`, { start: 2, end: 2 }), frameRate: 10 });
+        }
+        if (!this.anims.exists(`${char}_wallSlide`)) {
+            this.anims.create({ key: `${char}_wallSlide`, frames: this.anims.generateFrameNumbers(`${char}_deslizando`, { start: 1, end: 1 }), frameRate: 10 });
+        }
     }
 
     adicionarFiltroVisao() {
@@ -309,13 +354,17 @@ export class Game extends Scene {
         const velocidadeX = estaCorrendo ? 260 : 160; 
         const impulsoParedeX = estaCorrendo ? 320 : 220; 
 
-        if (tentouPular && noChao) activePlayer.setVelocityY(-400); 
+        if (tentouPular && noChao) {
+            activePlayer.setVelocityY(-400); 
+            if (this.somPulando) this.somPulando.play();
+        }
         if (estaNaParede) activePlayer.setVelocityY(50); 
 
         if (tentouPular && estaNaParede) {
             executouWallJump = true;
             if (indoDireita) { activePlayer.setVelocityX(impulsoParedeX); activePlayer.setVelocityY(-380); }
             else if (indoEsquerda) { activePlayer.setVelocityX(-impulsoParedeX); activePlayer.setVelocityY(-380); }
+            if (this.somPulando) this.somPulando.play();
         }
 
         if (!executouWallJump) {
@@ -324,25 +373,41 @@ export class Game extends Scene {
             else { activePlayer.setVelocityX(0); }
         }
 
-        if (this.personagemInicial === 'solar') {
-            if (isTouchingWall && !noChao && isFalling) activePlayer.anims.play('wallSlide', true);
-            else if (!noChao && Math.abs(body.velocity.y) > 15) {
-                if (body.velocity.y < 0) activePlayer.anims.play('jump', true);
-                else activePlayer.anims.play('fall', true);
-            } 
-            else if (body.velocity.x !== 0) {
-                if (estaCorrendo) activePlayer.anims.play('run', true);
-                else activePlayer.anims.play('walk', true);
-            } 
-            else {
-                activePlayer.anims.stop();
-                activePlayer.setTexture('solar_andando', 0); 
+        const char = this.personagemInicial; 
+
+        // Função rápida para calar os passos se estiver no ar ou parado
+        const silenciarPassos = () => {
+            if (this.somAndando && this.somAndando.isPlaying) this.somAndando.stop();
+            if (this.somCorrendo && this.somCorrendo.isPlaying) this.somCorrendo.stop();
+        };
+
+        if (isTouchingWall && !noChao && isFalling) {
+            activePlayer.anims.play(`${char}_wallSlide`, true);
+            silenciarPassos();
+        } else if (!noChao && Math.abs(body.velocity.y) > 15) {
+            if (body.velocity.y < 0) activePlayer.anims.play(`${char}_jump`, true);
+            else activePlayer.anims.play(`${char}_fall`, true);
+            silenciarPassos();
+        } else if (body.velocity.x !== 0) {
+            if (estaCorrendo) {
+                activePlayer.anims.play(`${char}_run`, true);
+                if (this.somAndando.isPlaying) this.somAndando.stop();
+                if (!this.somCorrendo.isPlaying) this.somCorrendo.play();
+            } else {
+                activePlayer.anims.play(`${char}_walk`, true);
+                if (this.somCorrendo.isPlaying) this.somCorrendo.stop();
+                if (!this.somAndando.isPlaying) this.somAndando.play();
             }
+        } else {
+            activePlayer.anims.stop();
+            activePlayer.setTexture(`${char}_andando`, 0); 
+            silenciarPassos();
         }
     }
 
     completouFase(jogador, teleportador) {
         if (this.jaEstaSaindo) return;
+        this.pararSonsMovimento();
         const quemMarcouPonto = this.personagemInicial; 
 
         const dadosTransicao = {

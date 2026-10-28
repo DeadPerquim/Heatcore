@@ -62,7 +62,7 @@ export class Preloader extends Scene {
       fontStyle: "bold"
     }).setOrigin(1, 0.5).setDepth(15);
 
-    const textoArquivo = this.add.text(cX - 234, cY + 45, "Initializing protocols...", {
+    const textoArquivo = this.add.text(cX - 234, cY + 45, "Initializando protocolos...", {
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 11,
       color: "#8888aa"
@@ -76,11 +76,11 @@ export class Preloader extends Scene {
     });
 
     this.load.on("fileprogress", (file) => {
-      textoArquivo.setText("Loading module: " + file.key);
+      textoArquivo.setText("Carrendo modulos: " + file.key);
     });
 
     this.load.on("complete", () => {
-      textoArquivo.setText("All modules loaded. Booting GUI...");
+      textoArquivo.setText("Todos modulso carregados. Iniciando GUI...");
     });
   }
 
@@ -103,9 +103,21 @@ export class Preloader extends Scene {
     this.load.spritesheet('solar_deslizando', 'assets/sprites/characters/Solar/DeslizandoParede.png', { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('solar_pulando', 'assets/sprites/characters/Solar/Pulando.png', { frameWidth: 16, frameHeight: 16 });
 
+    this.load.spritesheet('fornalha_andando', 'assets/sprites/characters/Fornalha/Andando.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('fornalha_caindo', 'assets/sprites/characters/Fornalha/Caindo.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('fornalha_correndo', 'assets/sprites/characters/Fornalha/Correndo.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('fornalha_deslizando', 'assets/sprites/characters/Fornalha/DeslizandoParede.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('fornalha_pulando', 'assets/sprites/characters/Fornalha/Pulando.png', { frameWidth: 16, frameHeight: 16 });
+
     this.load.audio('boot_pc', 'assets/audio/sfx/Old_90s_PC_boot_sequence.wav');
     this.load.audio('caindo', 'assets/audio/sfx/caindo.wav');
     this.load.audio('menu', 'assets/audio/music/menu.wav');
+    this.load.audio('ambientacao', 'assets/audio/sfx/Ambientação.mp3');
+
+    this.load.audio('sfx_andando', 'assets/audio/sfx/walking/Andando.mp3');
+    this.load.audio('sfx_pulando', 'assets/audio/sfx/jump/Pulando.mp3');
+    this.load.audio('sfx_correndo_solar', 'assets/audio/sfx/walking/CorrendoSolar.mp3');
+    this.load.audio('sfx_correndo_fornalha', 'assets/audio/sfx/walking/CorrendoFornalha.mp3');
 
     // Caminhos corretos para arquivos dentro da pasta public/assets/audio/sfx/menu/
     this.load.audio('pc_ligando', 'assets/audio/sfx/menu/PCLigando.mp3');
@@ -115,6 +127,8 @@ export class Preloader extends Scene {
 
     this.load.audio('sfx_mudar_opcao', 'assets/audio/sfx/menu/MudarOpções.mp3');
     this.load.audio('sfx_clicar_botao', 'assets/audio/sfx/menu/ClicarBotão.mp3');
+    this.load.audio('sfx_vitoria', 'assets/audio/sfx/menu/Vitoria.mp3');
+    this.load.audio('sfx_aplausos', 'assets/audio/sfx/menu/Aplausos.mp3');
   }
 
   create() {

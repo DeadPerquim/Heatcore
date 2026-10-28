@@ -23,6 +23,11 @@ export class Creditos extends Scene {
       this.add.image(0, 0, 'fundo_lab_creditos').setOrigin(0, 0).setDepth(0);
     }
 
+    let somAmbiente = this.sound.get('ambientacao');
+        if (somAmbiente && somAmbiente.isPlaying) {
+            somAmbiente.stop();
+        }
+
     // Luzes ambiente pulsantes
     this.glowAmber = this.add.circle(width * 0.25, height * 0.5, 240, 0xff5500, 0.12)
         .setBlendMode(Phaser.BlendModes.ADD)

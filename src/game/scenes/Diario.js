@@ -12,6 +12,20 @@ export class Diario extends Scene {
     }
 
     create() {
+        // =============== SISTEMA DE AMBIENTAÇÃO ===============
+        let somAmbiente = this.sound.get('ambientacao');
+        
+        // Se o som ainda não existe na memória, cria ele com loop ativado
+        if (!somAmbiente) {
+            somAmbiente = this.sound.add('ambientacao', { loop: true, volume: 0.8 }); 
+        }
+        
+        // Só dá o play se ele já não estiver tocando (garante a transição suave entre mapas)
+        if (!somAmbiente.isPlaying) {
+            somAmbiente.play();
+        }
+        // ======================================================
+
         this.cameras.main.fadeIn(600, 0, 0, 0);
 
         this.socket = this.game.socket;
@@ -139,56 +153,152 @@ export class Diario extends Scene {
             }
 
         } else if (this.modoDiario === 'LABIRINTO') {
+            ySolar = 6;
+            yFornalha = alt - 6;
+
+            let labirintoValido = false;
+            let tentativas = 0;
+            let gridLogico = [];
+
+            const passo = 4;
+            const cols = Math.floor((larg - 6) / passo);
+            const rows = Math.floor((alt - 6) / passo);
+
+            let startC = 0;
+            let startR = Math.max(0, Math.floor((ySolar - 3) / passo));
+            let endC = cols - 1;
+            let endR = Math.min(rows - 1, Math.floor((yFornalha - 3) / passo));
+
+            while (!labirintoValido && tentativas < 20) {
+                tentativas++;
+                gridLogico = Array.from({length: cols}, () => Array.from({length: rows}, () => ({ right: false, down: false })));
+
+                // 1. Geração Aleatória de Labirinto
+                for (let c = 0; c < cols; c++) {
+                    for (let r = 0; r < rows; r++) {
+                        if (c < cols - 1 && randomDiario() > 0.4) gridLogico[c][r].right = true;
+                        if (r < rows - 1 && randomDiario() > 0.4) gridLogico[c][r].down = true;
+                    }
+                }
+
+                // 2. VERIFICADOR DE CAMINHO (BFS - Breadth-First Search)
+                let visited = Array.from({length: cols}, () => Array(rows).fill(false));
+                let queue = [[startC, startR]];
+                visited[startC][startR] = true;
+                
+                let achouFim = false;
+
+                while(queue.length > 0) {
+                    let [c, r] = queue.shift();
+                    
+                    if (c === endC && r === endR) {
+                        achouFim = true;
+                        break;
+                    }
+
+                    // Checa Vizinhos
+                    if (c < cols - 1 && gridLogico[c][r].right && !visited[c+1][r]) {
+                        visited[c+1][r] = true; queue.push([c+1, r]);
+                    }
+                    if (c > 0 && gridLogico[c-1][r].right && !visited[c-1][r]) {
+                        visited[c-1][r] = true; queue.push([c-1, r]);
+                    }
+                    if (r < rows - 1 && gridLogico[c][r].down && !visited[c][r+1]) {
+                        visited[c][r+1] = true; queue.push([c, r+1]);
+                    }
+                    if (r > 0 && gridLogico[c][r-1].down && !visited[c][r-1]) {
+                        visited[c][r-1] = true; queue.push([c, r-1]);
+                    }
+                }
+
+                labirintoValido = achouFim;
+                
+                // 3. Failsafe (DFS): Se não gerou um labirinto válido pela sorte após 15 tentativas,
+                // criamos um Labirinto Perfeito usando "Spanning Tree" para GARANTIR uma saída sem forçar um buraco reto.
+                if (!labirintoValido && tentativas === 15) {
+                    gridLogico = Array.from({length: cols}, () => Array.from({length: rows}, () => ({ right: false, down: false })));
+                    let visitedDFS = Array.from({length: cols}, () => Array(rows).fill(false));
+                    let stack = [[startC, startR]];
+                    visitedDFS[startC][startR] = true;
+
+                    while(stack.length > 0) {
+                        let [c, r] = stack[stack.length - 1];
+                        let unvisited = [];
+                        
+                        if (c > 0 && !visitedDFS[c-1][r]) unvisited.push([c-1, r, 'left']);
+                        if (c < cols-1 && !visitedDFS[c+1][r]) unvisited.push([c+1, r, 'right']);
+                        if (r > 0 && !visitedDFS[c][r-1]) unvisited.push([c, r-1, 'up']);
+                        if (r < rows-1 && !visitedDFS[c][r+1]) unvisited.push([c, r+1, 'down']);
+
+                        if (unvisited.length > 0) {
+                            let next = unvisited[Math.floor(randomDiario() * unvisited.length)];
+                            visitedDFS[next[0]][next[1]] = true;
+                            
+                            if (next[2] === 'left') gridLogico[c-1][r].right = true;
+                            if (next[2] === 'right') gridLogico[c][r].right = true;
+                            if (next[2] === 'up') gridLogico[c][r-1].down = true;
+                            if (next[2] === 'down') gridLogico[c][r].down = true;
+                            
+                            stack.push([next[0], next[1]]);
+                        } else {
+                            stack.pop();
+                        }
+                    }
+
+                    // Adiciona quebras extras para o mapa perfeito não ter só 1 caminho (menos frustrante)
+                    for (let c = 0; c < cols; c++) {
+                        for (let r = 0; r < rows; r++) {
+                            if (c < cols - 1 && !gridLogico[c][r].right && randomDiario() > 0.8) gridLogico[c][r].right = true;
+                            if (r < rows - 1 && !gridLogico[c][r].down && randomDiario() > 0.8) gridLogico[c][r].down = true;
+                        }
+                    }
+                    labirintoValido = true;
+                }
+            }
+
+            // ----------------------------------------------------
+            // CONSTRUÇÃO FÍSICA DO LABIRINTO NO TILEMAP
+            // ----------------------------------------------------
             for (let x = 0; x < larg; x++) {
                 for (let y = 0; y < alt; y++) {
                     layerLimites.putTileAt(COR_MAPA_HOJE, x, y);
                 }
             }
 
-            ySolar = 6;
-            yFornalha = alt - 6;
+            const offsetX = 3;
+            const offsetY = 3;
 
-            let startX = 2;
-            let endX = larg - 3;
-
-            for (let x = startX; x <= endX; x++) {
-                let progresso = (x - startX) / (endX - startX);
-                let targetY = ySolar + (yFornalha - ySolar) * progresso;
-                let noise = (Math.floor(randomDiario() * 5) - 2); 
-                let currentY = Math.round(targetY + noise);
-                
-                if (currentY < 4) currentY = 4;
-                if (currentY > alt - 4) currentY = alt - 4;
-
-                for (let dy = -2; dy <= 2; dy++) {
-                    layerLimites.removeTileAt(x, currentY + dy);
-                }
-            }
-
-            const passo = 4;
-            for (let x = 3; x < larg - 3; x += passo) {
-                for (let y = 3; y < alt - 3; y += passo) {
+            for (let c = 0; c < cols; c++) {
+                for (let r = 0; r < rows; r++) {
+                    let px = offsetX + c * passo;
+                    let py = offsetY + r * passo;
+                    
+                    // Escava a Sala Base 3x3
                     for (let cx = 0; cx < 3; cx++) {
                         for (let cy = 0; cy < 3; cy++) {
-                            layerLimites.removeTileAt(x + cx, y + cy);
+                            layerLimites.removeTileAt(px + cx, py + cy);
                         }
                     }
 
-                    if (randomDiario() > 0.35 && x + passo < larg - 3) {
+                    // Escava os Corredores validos
+                    if (c < cols - 1 && gridLogico[c][r].right) {
                         for (let k = 0; k < passo; k++) {
-                            layerLimites.removeTileAt(x + k, y);
-                            layerLimites.removeTileAt(x + k, y + 1);
+                            layerLimites.removeTileAt(px + 2 + k, py);
+                            layerLimites.removeTileAt(px + 2 + k, py + 1);
+                            layerLimites.removeTileAt(px + 2 + k, py + 2); // 3 de Altura
                         }
                     }
-                    if (randomDiario() > 0.35 && y + passo < alt - 3) {
+                    if (r < rows - 1 && gridLogico[c][r].down) {
                         for (let k = 0; k < passo; k++) {
-                            layerLimites.removeTileAt(x, y + k);
-                            layerLimites.removeTileAt(x + 1, y + k);
+                            layerLimites.removeTileAt(px, py + 2 + k);
+                            layerLimites.removeTileAt(px + 1, py + 2 + k);
+                            layerLimites.removeTileAt(px + 2, py + 2 + k); // 3 de Largura
                         }
                     }
                 }
             }
 
+            // Spawns Seguros para não nascer preso na parede
             for (let x = 1; x <= 10; x++) {
                 for (let y = ySolar - 3; y <= ySolar + 1; y++) {
                     layerLimites.removeTileAt(x, y);
@@ -219,7 +329,7 @@ export class Diario extends Scene {
         };
 
         const coordLocal = posicoesSpawn[this.personagemInicial];
-        const chaveLocal = this.personagemInicial === 'solar' ? 'solar_andando' : 'Fornalha';
+        const chaveLocal = this.personagemInicial === 'solar' ? 'solar_andando' : 'fornalha_andando';
 
         this.jogadorAtual = this.physics.add.sprite(coordLocal.x, coordLocal.y, chaveLocal);
         this.jogadorAtual.setCircle(8).setCollideWorldBounds(true);
@@ -228,7 +338,7 @@ export class Diario extends Scene {
         this.jogadorAtual.estaRenascendo = false;
 
         const coordOutro = posicoesSpawn[this.outroPersonagemTipo];
-        const chaveSpriteOutro = this.outroPersonagemTipo === 'solar' ? 'solar_andando' : 'Fornalha';
+        const chaveSpriteOutro = this.outroPersonagemTipo === 'solar' ? 'solar_andando' : 'fornalha_andando';
 
         this.outroSprite = this.add.sprite(coordOutro.x, coordOutro.y, chaveSpriteOutro).setAlpha(0.9).setDepth(50);
         this.outroSprite.setVisible(false);
@@ -314,7 +424,6 @@ export class Diario extends Scene {
             }
         });
 
-        // CONTAINER TRAVADO NA TELA
         this.uiContainer = this.add.container(0, 0).setDepth(190);
         this.uiContainer.setScrollFactor(0);
 
@@ -327,6 +436,42 @@ export class Diario extends Scene {
         this.uiContainer.add(txtData);
 
         this.adicionarFiltroVisao();
+
+        // Configuração dos áudios de movimento do jogador local
+        this.somAndando = this.sound.add('sfx_andando', { loop: true, volume: 0.25 });
+        this.somCorrendo = this.sound.add(this.personagemInicial === 'solar' ? 'sfx_correndo_solar' : 'sfx_correndo_fornalha', { loop: true, volume: 0.25 });
+        this.somPulando = this.sound.add('sfx_pulando', { volume: 0.4 });
+    }
+
+    pararSonsMovimento() {
+        if (this.somAndando) {
+            this.somAndando.stop();
+            this.somAndando.destroy();
+        }
+        if (this.somCorrendo) {
+            this.somCorrendo.stop();
+            this.somCorrendo.destroy();
+        }
+    }
+
+    configurarAnimacoes() {
+        const char = this.personagemInicial; // 'solar' ou 'fornalha'
+        
+        if (!this.anims.exists(`${char}_walk`)) {
+            this.anims.create({ key: `${char}_walk`, frames: this.anims.generateFrameNumbers(`${char}_andando`, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
+        }
+        if (!this.anims.exists(`${char}_run`)) {
+            this.anims.create({ key: `${char}_run`, frames: this.anims.generateFrameNumbers(`${char}_correndo`, { start: 1, end: 2 }), frameRate: 15 });
+        }
+        if (!this.anims.exists(`${char}_jump`)) {
+            this.anims.create({ key: `${char}_jump`, frames: this.anims.generateFrameNumbers(`${char}_pulando`, { start: 2, end: 2 }), frameRate: 100 });
+        }
+        if (!this.anims.exists(`${char}_fall`)) {
+            this.anims.create({ key: `${char}_fall`, frames: this.anims.generateFrameNumbers(`${char}_caindo`, { start: 2, end: 2 }), frameRate: 10 });
+        }
+        if (!this.anims.exists(`${char}_wallSlide`)) {
+            this.anims.create({ key: `${char}_wallSlide`, frames: this.anims.generateFrameNumbers(`${char}_deslizando`, { start: 1, end: 1 }), frameRate: 10 });
+        }
     }
 
     adicionarFiltroVisao() {
@@ -425,14 +570,6 @@ export class Diario extends Scene {
         }
     }
 
-    configurarAnimacoes() {
-        if (!this.anims.exists('walk')) this.anims.create({ key: 'walk', frames: this.anims.generateFrameNumbers('solar_andando', { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
-        if (!this.anims.exists('run')) this.anims.create({ key: 'run', frames: this.anims.generateFrameNumbers('solar_correndo', { start: 1, end: 2 }), frameRate: 15 });
-        if (!this.anims.exists('jump')) this.anims.create({ key: 'jump', frames: this.anims.generateFrameNumbers('solar_pulando', { start: 2, end: 2 }), frameRate: 100 });
-        if (!this.anims.exists('fall')) this.anims.create({ key: 'fall', frames: this.anims.generateFrameNumbers('solar_caindo', { start: 2, end: 2 }), frameRate: 10 });
-        if (!this.anims.exists('wallSlide')) this.anims.create({ key: 'wallSlide', frames: this.anims.generateFrameNumbers('solar_deslizando', { start: 1, end: 1 }), frameRate: 10 });
-    }
-
     update() {
         if (this.jaEstaSaindo) return; 
 
@@ -525,13 +662,17 @@ export class Diario extends Scene {
         const velocidadeX = estaCorrendo ? 260 : 160; 
         const impulsoParedeX = estaCorrendo ? 320 : 220; 
 
-        if (tentouPular && noChao) activePlayer.setVelocityY(-400); 
+        if (tentouPular && noChao) {
+            activePlayer.setVelocityY(-400); 
+            if (this.somPulando) this.somPulando.play();
+        }
         if (estaNaParede) activePlayer.setVelocityY(50); 
 
         if (tentouPular && estaNaParede) {
             executouWallJump = true;
             if (indoDireita) { activePlayer.setVelocityX(impulsoParedeX); activePlayer.setVelocityY(-380); }
             else if (indoEsquerda) { activePlayer.setVelocityX(-impulsoParedeX); activePlayer.setVelocityY(-380); }
+            if (this.somPulando) this.somPulando.play();
         }
 
         if (!executouWallJump) {
@@ -540,20 +681,35 @@ export class Diario extends Scene {
             else { activePlayer.setVelocityX(0); }
         }
 
-        if (this.personagemInicial === 'solar') {
-            if (isTouchingWall && !noChao && isFalling) activePlayer.anims.play('wallSlide', true);
-            else if (!noChao && Math.abs(body.velocity.y) > 15) {
-                if (body.velocity.y < 0) activePlayer.anims.play('jump', true);
-                else activePlayer.anims.play('fall', true);
-            } 
-            else if (body.velocity.x !== 0) {
-                if (estaCorrendo) activePlayer.anims.play('run', true);
-                else activePlayer.anims.play('walk', true);
-            } 
-            else {
-                activePlayer.anims.stop();
-                activePlayer.setTexture('solar_andando', 0); 
+        const char = this.personagemInicial; 
+
+        // Função rápida para calar os passos se estiver no ar ou parado
+        const silenciarPassos = () => {
+            if (this.somAndando && this.somAndando.isPlaying) this.somAndando.stop();
+            if (this.somCorrendo && this.somCorrendo.isPlaying) this.somCorrendo.stop();
+        };
+
+        if (isTouchingWall && !noChao && isFalling) {
+            activePlayer.anims.play(`${char}_wallSlide`, true);
+            silenciarPassos();
+        } else if (!noChao && Math.abs(body.velocity.y) > 15) {
+            if (body.velocity.y < 0) activePlayer.anims.play(`${char}_jump`, true);
+            else activePlayer.anims.play(`${char}_fall`, true);
+            silenciarPassos();
+        } else if (body.velocity.x !== 0) {
+            if (estaCorrendo) {
+                activePlayer.anims.play(`${char}_run`, true);
+                if (this.somAndando.isPlaying) this.somAndando.stop();
+                if (!this.somCorrendo.isPlaying) this.somCorrendo.play();
+            } else {
+                activePlayer.anims.play(`${char}_walk`, true);
+                if (this.somCorrendo.isPlaying) this.somCorrendo.stop();
+                if (!this.somAndando.isPlaying) this.somAndando.play();
             }
+        } else {
+            activePlayer.anims.stop();
+            activePlayer.setTexture(`${char}_andando`, 0); 
+            silenciarPassos();
         }
     }
 
@@ -580,6 +736,8 @@ export class Diario extends Scene {
     completouMapaDiario(jogador, teleportador) {
         if (this.jaEstaSaindo) return;
         this.jaEstaSaindo = true;
+        this.pararSonsMovimento();
+        this.sound.play('sfx_vitoria', { volume: this.game.volumeSFX });
         
         if (this.socket) {
             this.socket.emit('faseDiarioConcluida');
@@ -594,7 +752,7 @@ export class Diario extends Scene {
         const height = this.scale.height;
 
         this.containerVitoria = this.add.container(0, 0).setDepth(1000); 
-        this.containerVitoria.setScrollFactor(0); // TRAVANDO O PAINEL DE VITÓRIA NA TELA
+        this.containerVitoria.setScrollFactor(0);
 
         const containerVitoria = this.containerVitoria;
 
@@ -635,7 +793,7 @@ export class Diario extends Scene {
             }
             spriteVencedor = this.add.image(width / 2, height / 2 - 30, 'Personagens', frameKey).setDisplaySize(140, 140);
         } else {
-            const chaveSprite = this.personagemInicial === 'solar' ? 'solar_andando' : 'Fornalha';
+            const chaveSprite = this.personagemInicial === 'solar' ? 'solar_andando' : 'fornalha_andando';
             spriteVencedor = this.add.sprite(width / 2, height / 2 - 30, chaveSprite, 0).setDisplaySize(140, 140);
         }
 

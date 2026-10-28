@@ -62,6 +62,11 @@ export class MainMenu extends Scene {
     console.log("🔊 Status Áudio MudarOpção:", this.cache.audio.exists('sfx_mudar_opcao'));
     console.log("🔊 Status Áudio ClicarBotão:", this.cache.audio.exists('sfx_clicar_botao'));
 
+    let somAmbiente = this.sound.get('ambientacao');
+        if (somAmbiente && somAmbiente.isPlaying) {
+            somAmbiente.stop();
+        }
+
     // ==========================================
     // 0.1 CONEXÃO COM O SERVIDOR MULTIPLAYER
     // ==========================================
@@ -192,7 +197,7 @@ export class MainMenu extends Scene {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
     }).setAlpha(0.5).setDepth(20);
 
-    this.add.text(width - 30, height - 30, "HEATCORE v1.2.1 - REPARO DIARIO", {
+    this.add.text(width - 30, height - 30, "HEATCORE v1.3.0 - ALPHA", {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
     }).setOrigin(1, 1).setAlpha(0.5).setDepth(20);
 
