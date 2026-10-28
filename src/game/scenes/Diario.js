@@ -12,15 +12,16 @@ export class Diario extends Scene {
     }
 
     create() {
+        // Puxa o volume global apenas uma vez no topo do create
+        const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
+
         // =============== SISTEMA DE AMBIENTAÇÃO ===============
         let somAmbiente = this.sound.get('ambientacao');
         
-        // Se o som ainda não existe na memória, cria ele com loop ativado
         if (!somAmbiente) {
             somAmbiente = this.sound.add('ambientacao', { loop: true, volume: 0.8 }); 
         }
         
-        // Só dá o play se ele já não estiver tocando (garante a transição suave entre mapas)
         if (!somAmbiente.isPlaying) {
             somAmbiente.play();
         }
@@ -77,7 +78,7 @@ export class Diario extends Scene {
         const layerObjetos = map.createLayer('Objetos', arrayTilesets, 0, 0);
 
         if (this.cache.audio.has('som_queda')) {
-            this.somQueda = this.sound.add('som_queda');
+            this.somQueda = this.sound.add('som_queda', { volume: volSFX });
         }
 
         const BASE_TEXTURAS1 = 3;
@@ -213,8 +214,7 @@ export class Diario extends Scene {
 
                 labirintoValido = achouFim;
                 
-                // 3. Failsafe (DFS): Se não gerou um labirinto válido pela sorte após 15 tentativas,
-                // criamos um Labirinto Perfeito usando "Spanning Tree" para GARANTIR uma saída sem forçar um buraco reto.
+                // 3. Failsafe (DFS): Se não gerou um labirinto válido pela sorte após 15 tentativas
                 if (!labirintoValido && tentativas === 15) {
                     gridLogico = Array.from({length: cols}, () => Array.from({length: rows}, () => ({ right: false, down: false })));
                     let visitedDFS = Array.from({length: cols}, () => Array(rows).fill(false));
@@ -245,7 +245,7 @@ export class Diario extends Scene {
                         }
                     }
 
-                    // Adiciona quebras extras para o mapa perfeito não ter só 1 caminho (menos frustrante)
+                    // Adiciona quebras extras para o mapa perfeito não ter só 1 caminho
                     for (let c = 0; c < cols; c++) {
                         for (let r = 0; r < rows; r++) {
                             if (c < cols - 1 && !gridLogico[c][r].right && randomDiario() > 0.8) gridLogico[c][r].right = true;
@@ -437,10 +437,10 @@ export class Diario extends Scene {
 
         this.adicionarFiltroVisao();
 
-        // Configuração dos áudios de movimento do jogador local
-        this.somAndando = this.sound.add('sfx_andando', { loop: true, volume: 0.25 });
-        this.somCorrendo = this.sound.add(this.personagemInicial === 'solar' ? 'sfx_correndo_solar' : 'sfx_correndo_fornalha', { loop: true, volume: 0.25 });
-        this.somPulando = this.sound.add('sfx_pulando', { volume: 0.4 });
+        // Configuração dos áudios de movimento com volume do menu de opções
+        this.somAndando = this.sound.add('sfx_andando', { loop: true, volume: 0.25 * volSFX });
+        this.somCorrendo = this.sound.add(this.personagemInicial === 'solar' ? 'sfx_correndo_solar' : 'sfx_correndo_fornalha', { loop: true, volume: 0.25 * volSFX });
+        this.somPulando = this.sound.add('sfx_pulando', { volume: 0.4 * volSFX });
     }
 
     pararSonsMovimento() {
@@ -573,6 +573,9 @@ export class Diario extends Scene {
     update() {
         if (this.jaEstaSaindo) return; 
 
+        // Puxa o volume global apenas uma vez no topo do update
+        const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
+
         const limiteQueda = this.mapaAlturaTotal + 40; 
         
         if (this.jogadorAtual && this.jogadorAtual.y > limiteQueda && !this.jogadorAtual.estaRenascendo) {
@@ -580,9 +583,9 @@ export class Diario extends Scene {
 
             if (this.somQueda) {
                 this.somQueda.stop();
-                this.somQueda.play();
+                this.somQueda.play({ volume: volSFX });
             } else if (this.cache.audio.has('caindo')) {
-                this.sound.play('caindo');
+                this.sound.play('caindo', { volume: volSFX });
             }
 
             this.cameras.main.stopFollow();
@@ -627,27 +630,61 @@ export class Diario extends Scene {
         this.apertouD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
         this.apertouShift = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
 
+        // ==========================================
+        // MAPEAMENTO HÍBRIDO NATIVO (Xbox + PlayStation + SNES)
+        // ==========================================
+        const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+        
+        const isBtnPressed = (padObj, index) => {
+            if (padObj && padObj.buttons && padObj.buttons[index]) {
+                if (padObj.buttons[index].pressed || padObj.buttons[index].value > 0.5) return true;
+            }
+            if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+                const rawPads = navigator.getGamepads();
+                for (let i = 0; i < rawPads.length; i++) {
+                    const rp = rawPads[i];
+                    if (rp && rp.buttons && rp.buttons[index] && (rp.buttons[index].pressed || rp.buttons[index].value > 0.5)) return true;
+                }
+            }
+            return false;
+        };
+
+        const getAxisValue = (padObj, axisIndex) => {
+            if (padObj && padObj.axes && padObj.axes.length > axisIndex) {
+                let v = padObj.axes[axisIndex];
+                return (typeof v === 'number') ? v : (v ? v.getValue() : 0);
+            }
+            if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+                const rawPads = navigator.getGamepads();
+                for (let i = 0; i < rawPads.length; i++) {
+                    const rp = rawPads[i];
+                    if (rp && rp.axes && rp.axes.length > axisIndex) {
+                        return rp.axes[axisIndex];
+                    }
+                }
+            }
+            return 0;
+        };
+
         let indoEsquerda = this.cursors.left.isDown || this.apertouA.isDown;
         let indoDireita = this.cursors.right.isDown || this.apertouD.isDown;
         let tentouPular = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space) || this.apertouW.isDown;
         let estaCorrendo = this.apertouShift.isDown;
 
-        const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+        const padAtivo = pad || (typeof navigator !== 'undefined' && navigator.getGamepads && navigator.getGamepads().filter(p => p).length > 0);
 
-        const isBtnPressed = (padObj, index) => {
-            if (!padObj || !padObj.buttons || !padObj.buttons[index]) return false;
-            return padObj.buttons[index].pressed || padObj.buttons[index].value > 0.5;
-        };
+        if (padAtivo) {
+            const axisX = (pad && pad.leftStick ? pad.leftStick.x : 0) || getAxisValue(pad, 0);
+            
+            if (axisX < -0.2 || (pad && pad.left) || isBtnPressed(pad, 14)) indoEsquerda = true;
+            if (axisX > 0.2 || (pad && pad.right) || isBtnPressed(pad, 15)) indoDireita = true;
 
-        if (pad) {
-            const axisX = pad.leftStick ? pad.leftStick.x : 0;
-            if (axisX < -0.2 || pad.left || isBtnPressed(pad, 14)) indoEsquerda = true;
-            if (axisX > 0.2 || pad.right || isBtnPressed(pad, 15)) indoDireita = true;
+            // B0 (A), B1 (B) = Pular | B2 (X), B3 (Y), L, R = Correr
+            if (isBtnPressed(pad, 2) || isBtnPressed(pad, 1) || (pad && pad.A)) tentouPular = true;
+            if (isBtnPressed(pad, 3) || isBtnPressed(pad, 6) || (pad && pad.R2 && pad.R2 > 0.1)) estaCorrendo = true;
 
-            if (isBtnPressed(pad, 2) || isBtnPressed(pad, 0) || pad.A) tentouPular = true;
-            if (isBtnPressed(pad, 6) || isBtnPressed(pad, 3) || isBtnPressed(pad, 7) || (pad.R2 && pad.R2 > 0.1)) estaCorrendo = true;
-
-            if (isBtnPressed(pad, 1) || isBtnPressed(pad, 8)) {
+            // B8 (Select), B9 (Start) = Sair
+            if (isBtnPressed(pad, 8) || isBtnPressed(pad, 9)) {
                 this.voltarParaMenu();
                 return;
             }
@@ -664,7 +701,7 @@ export class Diario extends Scene {
 
         if (tentouPular && noChao) {
             activePlayer.setVelocityY(-400); 
-            if (this.somPulando) this.somPulando.play();
+            if (this.somPulando) this.somPulando.play({ volume: 0.4 * volSFX });
         }
         if (estaNaParede) activePlayer.setVelocityY(50); 
 
@@ -672,7 +709,7 @@ export class Diario extends Scene {
             executouWallJump = true;
             if (indoDireita) { activePlayer.setVelocityX(impulsoParedeX); activePlayer.setVelocityY(-380); }
             else if (indoEsquerda) { activePlayer.setVelocityX(-impulsoParedeX); activePlayer.setVelocityY(-380); }
-            if (this.somPulando) this.somPulando.play();
+            if (this.somPulando) this.somPulando.play({ volume: 0.4 * volSFX });
         }
 
         if (!executouWallJump) {
@@ -737,7 +774,9 @@ export class Diario extends Scene {
         if (this.jaEstaSaindo) return;
         this.jaEstaSaindo = true;
         this.pararSonsMovimento();
-        this.sound.play('sfx_vitoria', { volume: this.game.volumeSFX });
+        
+        const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
+        this.sound.play('sfx_vitoria', { volume: volSFX });
         
         if (this.socket) {
             this.socket.emit('faseDiarioConcluida');
