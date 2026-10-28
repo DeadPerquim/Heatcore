@@ -79,7 +79,7 @@ export class Creditos extends Scene {
     // ==========================================
     // 2. HUD INDUSTRIAL E BOTÃO VOLTAR
     // ==========================================
-    this.add.text(30, 25, "MODULE // CREDITS_ARCHIVE", {
+    this.add.text(30, 25, "MODULO // ARQUIVO_CREDITOS", {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#00f3ff"
     }).setAlpha(0.6).setDepth(200);
 

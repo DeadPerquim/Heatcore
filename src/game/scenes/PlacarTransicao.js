@@ -59,11 +59,11 @@ export class PlacarTransicao extends Scene {
         // ==========================================
         // 2. HUD INDUSTRIAL
         // ==========================================
-        this.add.text(30, 30, "SYS_STATUS // MATCH_RESULTS", {
+        this.add.text(30, 30, "SYS_STATUS // RESULTADOS_CONCLUSÃO", {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: "#00f3ff"
         }).setAlpha(0.6).setDepth(10);
 
-        this.add.text(width - 30, height - 30, `TARGET: ${this.proximaCena.toUpperCase()}`, {
+        this.add.text(width - 30, height - 30, `PROXIMA FASE: ${this.proximaCena.toUpperCase()}`, {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#8888aa"
         }).setOrigin(1, 1).setAlpha(0.5).setDepth(10);
 

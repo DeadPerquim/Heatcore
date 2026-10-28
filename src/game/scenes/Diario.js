@@ -14,9 +14,6 @@ export class Diario extends Scene {
     create() {
         this.cameras.main.fadeIn(600, 0, 0, 0);
 
-        // ==========================================
-        // 0. CONEXÃO SOCKET.IO & MULTIPLAYER
-        // ==========================================
         this.socket = this.game.socket;
         this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
 
@@ -27,9 +24,6 @@ export class Diario extends Scene {
             });
         }
 
-        // ==========================================
-        // SEMENTE ÚNICA SINCRONIZADA POR DIA + MODO
-        // ==========================================
         const dataSimulada = new Date();
         dataSimulada.setDate(dataSimulada.getDate() + this.offsetDias);
         
@@ -51,9 +45,6 @@ export class Diario extends Scene {
             return ((t ^ t >>> 14) >>> 0) / 4294967296;
         };
 
-        // ==========================================
-        // 1. TILESETS E CAMADAS
-        // ==========================================
         const map = this.make.tilemap({ key: 'mapa' });
 
         const arrayTilesets = [
@@ -94,10 +85,6 @@ export class Diario extends Scene {
 
         let ySolar = 15;
         let yFornalha = 15;
-
-        // ==========================================
-        // 2. MOTORES DE GERAÇÃO PROCEDURAL
-        // ==========================================
 
         if (this.modoDiario === 'PLATAFORMAS') {
             for (let x = 0; x < larg; x++) {
@@ -161,6 +148,23 @@ export class Diario extends Scene {
             ySolar = 6;
             yFornalha = alt - 6;
 
+            let startX = 2;
+            let endX = larg - 3;
+
+            for (let x = startX; x <= endX; x++) {
+                let progresso = (x - startX) / (endX - startX);
+                let targetY = ySolar + (yFornalha - ySolar) * progresso;
+                let noise = (Math.floor(randomDiario() * 5) - 2); 
+                let currentY = Math.round(targetY + noise);
+                
+                if (currentY < 4) currentY = 4;
+                if (currentY > alt - 4) currentY = alt - 4;
+
+                for (let dy = -2; dy <= 2; dy++) {
+                    layerLimites.removeTileAt(x, currentY + dy);
+                }
+            }
+
             const passo = 4;
             for (let x = 3; x < larg - 3; x += passo) {
                 for (let y = 3; y < alt - 3; y += passo) {
@@ -206,9 +210,6 @@ export class Diario extends Scene {
         this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.physics.world.setBoundsCollision(true, true, true, false);
 
-        // ==========================================
-        // 3. SPAWN DE PERSONAGENS & TELEPORTADORES
-        // ==========================================
         const TW = map.tileWidth;
         const TH = map.tileHeight;
 
@@ -238,9 +239,18 @@ export class Diario extends Scene {
                 if (!posicoes) return;
                 const dadosOutro = posicoes[this.outroPersonagemTipo];
                 if (dadosOutro && this.outroSprite) {
-                    this.outroSprite.x = dadosOutro.x;
-                    this.outroSprite.y = dadosOutro.y;
-                    this.outroSprite.setVisible(true);
+                    if ((dadosOutro.x === 0 && dadosOutro.y === 0) || (dadosOutro.cena && dadosOutro.cena !== this.scene.key)) {
+                        this.outroSprite.setVisible(false);
+                    } else {
+                        this.outroSprite.x = dadosOutro.x;
+                        this.outroSprite.y = dadosOutro.y;
+                        this.outroSprite.setVisible(true);
+
+                        if (this.timeoutOutroJogador) clearTimeout(this.timeoutOutroJogador);
+                        this.timeoutOutroJogador = setTimeout(() => {
+                            if (this.outroSprite) this.outroSprite.setVisible(false);
+                        }, 2500);
+                    }
                 }
             });
         }
@@ -251,9 +261,6 @@ export class Diario extends Scene {
         const teleporter1 = this.teleporters.create(3 * TW, (ySolar - 1) * TH, 'corredorEsquerdo').setVisible(false);
         const teleporter2 = this.teleporters.create((larg - 4) * TW, (yFornalha - 1) * TH, 'corredorDireito').setVisible(false);
 
-        // ==========================================
-        // 4. MODO ESCURO COM CANVAS (IGUAL AO GAME E MAPA2)
-        // ==========================================
         const larguraEscuro = 2500;
         const alturaEscuro = 2500;
         const raioLuz = 24;
@@ -261,34 +268,18 @@ export class Diario extends Scene {
         if (!this.textures.exists('escuridaoComFuro')) {
             const canvasTexture = this.textures.createCanvas('escuridaoComFuro', larguraEscuro, alturaEscuro);
             const ctx = canvasTexture.context;
-
             ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
             ctx.fillRect(0, 0, larguraEscuro, alturaEscuro);
-
             ctx.globalCompositeOperation = 'destination-out';
             ctx.beginPath();
             ctx.arc(larguraEscuro / 2, alturaEscuro / 2, raioLuz, 0, Math.PI * 2);
             ctx.fill();
-
             canvasTexture.refresh();
         }
         
         this.escuroAtivo = false;
         this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro').setDepth(150).setVisible(false);
 
-        // ==========================================
-        // HUD DA MÁQUINA DO TEMPO
-        // ==========================================
-        let stringData = dataSimulada.toLocaleDateString();
-        let textoOffset = this.offsetDias === 0 ? "HOJE" : (this.offsetDias > 0 ? `+${this.offsetDias} DIA(S)` : `${this.offsetDias} DIA(S)`);
-
-        this.add.text(40, 25, `MAPA DIÁRIO: ${textoOffset} (${stringData})`, {
-            fontFamily: "'Courier New', Courier, monospace", fontSize: 16, color: "#ff9900", stroke: "#000000", strokeThickness: 3
-        }).setScrollFactor(0).setDepth(200);
-
-        // ==========================================
-        // 5. FÍSICAS E ANIMAÇÕES
-        // ==========================================
         this.physics.add.collider(this.jogadorAtual, layerLimites);
         this.physics.add.collider(this.jogadorAtual, layerObjetos);
 
@@ -297,25 +288,21 @@ export class Diario extends Scene {
 
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.cameras.main.startFollow(this.jogadorAtual);
+        this.cameras.main.setZoom(1); 
 
         this.configurarAnimacoes();
         
         this.cursors = this.input.keyboard.createCursorKeys();
         this.jaEstaSaindo = false;
 
-        // ==========================================
-        // 6. EVENTOS DE TECLADO NATIVOS (+, -, E, ESC)
-        // ==========================================
         this.input.keyboard.on('keydown', (event) => {
             if (this.jaEstaSaindo) return;
-
             if (event.key === 'e' || event.key === 'E') {
                 this.escuroAtivo = !this.escuroAtivo;
                 if (this.escuridaoSprite) {
                     this.escuridaoSprite.setVisible(this.escuroAtivo);
                 }
             }
-
             if (event.key === '+' || event.key === '=' || event.code === 'NumpadAdd') {
                 this.scene.restart({ offsetDias: this.offsetDias + 1, personagem: this.personagemInicial, modoDiario: this.modoDiario });
             }
@@ -327,17 +314,27 @@ export class Diario extends Scene {
             }
         });
 
-        // Adiciona a estética de monitor no final
+        // CONTAINER TRAVADO NA TELA
+        this.uiContainer = this.add.container(0, 0).setDepth(190);
+        this.uiContainer.setScrollFactor(0);
+
+        let stringData = dataSimulada.toLocaleDateString();
+        let textoOffset = this.offsetDias === 0 ? "HOJE" : (this.offsetDias > 0 ? `+${this.offsetDias} DIA(S)` : `${this.offsetDias} DIA(S)`);
+
+        const txtData = this.add.text(40, 25, `MAPA DIÁRIO: ${textoOffset} (${stringData})`, {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 16, color: "#ff9900", stroke: "#000000", strokeThickness: 3
+        });
+        this.uiContainer.add(txtData);
+
         this.adicionarFiltroVisao();
     }
 
     adicionarFiltroVisao() {
         const sw = this.scale.width;
         const sh = this.scale.height;
-        const uiContainer = this.add.container(0, 0).setScrollFactor(0).setDepth(190);
+        const uiContainer = this.uiContainer;
 
         if (this.personagemInicial === 'solar') {
-            // --- VISÃO SOLAR (Futurista / Cyan / Paineis Solares) ---
             if (!this.textures.exists('vinheta_solar')) {
                 const canvas = this.textures.createCanvas('vinheta_solar', sw, sh);
                 const ctx = canvas.context;
@@ -350,23 +347,17 @@ export class Diario extends Scene {
             }
             uiContainer.add(this.add.image(0, 0, 'vinheta_solar').setOrigin(0,0));
 
-            // Grid Fotovoltaico do Painel Solar
             if (!this.textures.exists('grid_solar')) {
                 const gridCanvas = this.textures.createCanvas('grid_solar', sw, sh);
                 const ctx = gridCanvas.context;
-                
-                // Linhas finas das células
                 ctx.strokeStyle = 'rgba(0, 243, 255, 0.03)';
                 ctx.lineWidth = 1;
                 for (let x = 0; x < sw; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sh); ctx.stroke(); }
                 for (let y = 0; y < sh; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sw, y); ctx.stroke(); }
-                
-                // Linhas grossas das placas divisórias
                 ctx.strokeStyle = 'rgba(0, 243, 255, 0.08)';
                 ctx.lineWidth = 2;
                 for (let x = 0; x < sw; x += 120) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sh); ctx.stroke(); }
                 for (let y = 0; y < sh; y += 120) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sw, y); ctx.stroke(); }
-                
                 gridCanvas.refresh();
             }
             uiContainer.add(this.add.image(0, 0, 'grid_solar').setOrigin(0,0));
@@ -384,9 +375,7 @@ export class Diario extends Scene {
             g.fillCircle(sw/2, 20, 2); g.fillCircle(sw/2, sh - 20, 2);
             g.fillCircle(20, sh/2, 2); g.fillCircle(sw - 20, sh/2, 2);
             uiContainer.add(g);
-
         } else {
-            // --- VISÃO FORNALHA (Ferrugem / Amarelado / Retalho) ---
             if (!this.textures.exists('vinheta_fornalha')) {
                 const canvas = this.textures.createCanvas('vinheta_fornalha', sw, sh);
                 const ctx = canvas.context;
@@ -400,28 +389,23 @@ export class Diario extends Scene {
             uiContainer.add(this.add.image(0, 0, 'vinheta_fornalha').setOrigin(0,0));
 
             let g = this.add.graphics();
-
             const drawScrap = (x, y, multX, multY) => {
                 g.fillStyle(0x2d170e, 0.9);
                 g.beginPath();
                 g.moveTo(x, y); g.lineTo(x + (120 * multX), y); g.lineTo(x, y + (120 * multY));
                 g.closePath(); g.fillPath();
-
                 g.fillStyle(0x4a1c11, 0.95);
                 g.beginPath();
                 g.moveTo(x, y); g.lineTo(x + (75 * multX), y); g.lineTo(x, y + (75 * multY));
                 g.closePath(); g.fillPath();
-
                 g.fillStyle(0x6b2b11, 1);
                 g.fillRect(multX > 0 ? x : x - 20, multY > 0 ? y : y - 90, 20, 90);
                 g.fillRect(multX > 0 ? x : x - 90, multY > 0 ? y : y - 20, 90, 20);
-
                 g.fillStyle(0x8a9294, 1);
                 g.fillCircle(x + (12 * multX), y + (12 * multY), 4);
                 g.fillCircle(x + (45 * multX), y + (10 * multY), 3);
                 g.fillCircle(x + (10 * multX), y + (45 * multY), 3);
             };
-
             drawScrap(0, 0, 1, 1);
             drawScrap(sw, 0, -1, 1);
             drawScrap(0, sh, 1, -1);
@@ -495,7 +479,8 @@ export class Diario extends Scene {
         if (this.socket) {
             this.socket.emit('enviarPosicao', {
                 x: activePlayer.x,
-                y: activePlayer.y
+                y: activePlayer.y,
+                cena: this.scene.key
             });
         }
 
@@ -608,31 +593,27 @@ export class Diario extends Scene {
         const width = this.scale.width;
         const height = this.scale.height;
 
-        const containerVitoria = this.add.container(0, 0).setScrollFactor(0).setDepth(1000);
+        this.containerVitoria = this.add.container(0, 0).setDepth(1000); 
+        this.containerVitoria.setScrollFactor(0); // TRAVANDO O PAINEL DE VITÓRIA NA TELA
 
-        // ==========================================
-        // TELA DE VITÓRIA ESTILO TERMINAL / SISTEMA
-        // ==========================================
+        const containerVitoria = this.containerVitoria;
+
         const corHex = this.personagemInicial === 'solar' ? 0x00f3ff : 0xff8800;
         const corStr = this.personagemInicial === 'solar' ? "#00f3ff" : "#ff8800";
 
-        // Fundo Sólido Moderno
         const fundo = this.add.rectangle(0, 0, width, height, 0x0a0a12, 0.95).setOrigin(0, 0);
         containerVitoria.add(fundo);
 
-        // Scanlines
         let linhasTV = this.add.graphics();
         linhasTV.fillStyle(0x000000, 0.4);
         for(let i = 0; i < height; i += 4) linhasTV.fillRect(0, i, width, 2);
         containerVitoria.add(linhasTV);
 
-        // Moldura Tecnológica da cor do vencedor
         let moldura = this.add.graphics();
         moldura.lineStyle(2, corHex, 0.6);
         moldura.strokeRect(30, 30, width - 60, height - 60);
         containerVitoria.add(moldura);
 
-        // Texto de Sistema / Terminal
         const txtTerminal = this.add.text(45, 45, "HEATCORE_OS // DIARY_SIMULATION_COMPLETE\n> UPLINK ESTABLISHED...\n> WINNER IDENTIFIED:", {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: corStr, shadow: { offsetX: 0, offsetY: 0, color: corStr, blur: 4, fill: true }
         });
@@ -640,7 +621,6 @@ export class Diario extends Scene {
 
         const nomeVencedor = this.personagemInicial.toUpperCase();
 
-        // Extrai ou pega o sprite do vencedor
         let spriteVencedor;
         if (this.textures.exists('Personagens')) {
             const tex = this.textures.get('Personagens');
@@ -659,7 +639,6 @@ export class Diario extends Scene {
             spriteVencedor = this.add.sprite(width / 2, height / 2 - 30, chaveSprite, 0).setDisplaySize(140, 140);
         }
 
-        // Efeito de Cintilação Holográfica no Vencedor
         spriteVencedor.setTint(corHex);
         this.tweens.add({
             targets: spriteVencedor,
@@ -671,7 +650,6 @@ export class Diario extends Scene {
         
         containerVitoria.add(spriteVencedor);
 
-        // Texto Principal de Vitória
         const textoVitoria = this.add.text(width / 2, height / 2 + 70, `>> ${nomeVencedor} VENCEU <<`, {
             fontFamily: "'Courier New', Courier, monospace",
             fontSize: 28,
@@ -683,7 +661,6 @@ export class Diario extends Scene {
         }).setOrigin(0.5);
         containerVitoria.add(textoVitoria);
 
-        // Animação de Pulsar
         this.tweens.add({
             targets: textoVitoria,
             scale: { from: 0.95, to: 1.05 },

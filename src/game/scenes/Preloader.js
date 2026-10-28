@@ -39,7 +39,7 @@ export class Preloader extends Scene {
     linhasTV.generateTexture('scanlines_preload_mod', width, height);
     this.add.image(0, 0, 'scanlines_preload_mod').setOrigin(0, 0).setDepth(10);
 
-    this.add.text(cX, cY - 40, "SYS_LOADER // COMPILING ASSETS...", {
+    this.add.text(cX, cY - 40, "SYS_LOADER // COMPILANDO ASSETS...", {
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 16,
       color: "#00f3ff",

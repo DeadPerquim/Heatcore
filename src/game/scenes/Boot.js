@@ -76,7 +76,7 @@ export class Boot extends Scene {
     // ==========================================
     // 2. TELA DE ESPERA / STANDBY
     // ==========================================
-    let avisoTexto = this.add.text(cX, cY - 15, "SYS_STANDBY // AWAITING ACTIVATION SIGNAL...", {
+    let avisoTexto = this.add.text(cX, cY - 15, "SYS_STANDBY // ESPERANDO SINAL DE ATIVAÇÃO...", {
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 16,
       color: "#00f3ff",
@@ -84,7 +84,7 @@ export class Boot extends Scene {
       shadow: { offsetX: 0, offsetY: 0, color: '#00f3ff', blur: 8, fill: true } 
     }).setOrigin(0.5).setDepth(5);
 
-    let subTexto = this.add.text(cX, cY + 25, "[ PRESSIONE QUALQUER TECLA OU CLIQUE PARA INICIAR ]", {
+    let subTexto = this.add.text(cX, cY + 25, "[ PRESSIONE QUALQUER TECLA, BOTÃO OU CLIQUE PARA INICIAR ]", {
         fontFamily: "'Courier New', Courier, monospace",
         fontSize: 13,
         color: "#8888aa",

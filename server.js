@@ -120,6 +120,6 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`🔥 HEATCORE SERVER ONLINE NA FEIRA! 🔥`);
     console.log(`--------------------------------------------------`);
     console.log(`💻 No computador principal: http://localhost:${PORT}`);
-    console.log(`📱 No celular/outros PCs no Wi-Fi: http://${ip}:${PORT} ou http://heatcore:${PORT}`);
+    console.log(`📱 No celular/outros PCs no Wi-Fi: http://${ip}:${PORT}`);
     console.log(`==================================================\n`);
 });

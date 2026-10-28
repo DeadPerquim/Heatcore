@@ -6,8 +6,7 @@ export class Mapa3 extends Scene {
     }
 
     init(data) {
-        // Prioriza rigorosamente o personagem guardado globalmente na sessão do jogo
-        this.personagemInicial = this.game.meuPersonagem || (data && data.personagem) || 'solar';
+        this.personagemInicial = (data && data.personagem) ? data.personagem : (this.game.meuPersonagem || 'solar');
         this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
         
         this.pontosSolar = data ? (data.pontosSolar || 0) : 0;
@@ -19,9 +18,6 @@ export class Mapa3 extends Scene {
     create() {
         this.cameras.main.fadeIn(600, 0, 0, 0);
 
-        // ==========================================
-        // 0. CONEXÃO SOCKET.IO & MULTIPLAYER
-        // ==========================================
         this.socket = this.game.socket;
 
         if (this.socket) {
@@ -37,9 +33,6 @@ export class Mapa3 extends Scene {
             });
         }
 
-        // ==========================================
-        // 1. CRIAÇÃO DO MAPA E LIMITES DE QUEDA
-        // ==========================================
         const map = this.make.tilemap({ key: 'mapa3' });
 
         const tsFundo = map.addTilesetImage('FundoMetal', 'FundoMetal');
@@ -62,17 +55,12 @@ export class Mapa3 extends Scene {
 
         this.mapaAlturaTotal = map.heightInPixels;
 
-        // VERIFICAÇÃO DEFENSIVA: Evita Uncaught TypeError se a camada for null
         if (layerLimites) layerLimites.setCollisionByExclusion([-1]);
         if (layerObjetos) layerObjetos.setCollisionByExclusion([-1]);
         
-        // ⚙️ DESATIVA A COLISÃO DO CHÃO DO MUNDO PARA PERMITIR CAIR NO ABISMO
         this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.physics.world.setBoundsCollision(true, true, true, false);
 
-        // ==========================================
-        // ESCURIDÃO COM FURO CIRCULAR (MODO OTIMIZADO)
-        // ==========================================
         const largura = 2500; 
         const altura = 2500;
         const raioLuz = 24;   
@@ -80,24 +68,18 @@ export class Mapa3 extends Scene {
         if (!this.textures.exists('escuridaoComFuro')) {
             const canvasTexture = this.textures.createCanvas('escuridaoComFuro', largura, altura);
             const ctx = canvasTexture.context;
-
             ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
             ctx.fillRect(0, 0, largura, altura);
-
             ctx.globalCompositeOperation = 'destination-out';
             ctx.beginPath();
             ctx.arc(largura / 2, altura / 2, raioLuz, 0, Math.PI * 2);
             ctx.fill();
-
             canvasTexture.refresh();
         }
 
         this.escuroAtivo = false;
         this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro').setDepth(150).setVisible(false);
 
-        // ==========================================
-        // 2. SPAWN DO PERSONAGEM LOCAL E REMOTO
-        // ==========================================
         const posicoesSpawn = {
             solar: { x: 247.5, y: 1100 },
             fornalha: { x: 1050, y: 1100 }
@@ -124,24 +106,26 @@ export class Mapa3 extends Scene {
                 if (!posicoes) return;
                 const dadosOutro = posicoes[this.outroPersonagemTipo];
                 if (dadosOutro && this.outroSprite) {
-                    this.outroSprite.x = dadosOutro.x;
-                    this.outroSprite.y = dadosOutro.y;
-                    this.outroSprite.setVisible(true);
+                    if ((dadosOutro.x === 0 && dadosOutro.y === 0) || (dadosOutro.cena && dadosOutro.cena !== this.scene.key)) {
+                        this.outroSprite.setVisible(false);
+                    } else {
+                        this.outroSprite.x = dadosOutro.x;
+                        this.outroSprite.y = dadosOutro.y;
+                        this.outroSprite.setVisible(true);
+
+                        if (this.timeoutOutroJogador) clearTimeout(this.timeoutOutroJogador);
+                        this.timeoutOutroJogador = setTimeout(() => {
+                            if (this.outroSprite) this.outroSprite.setVisible(false);
+                        }, 2500);
+                    }
                 }
             });
         }
 
-        // ==========================================
-        // 2.1 TELEPORTADORES
-        // ==========================================
         this.teleporters = this.physics.add.staticGroup();
-
         const teleporter1 = this.teleporters.create(210, 1090, 'corredorEsquerdo').setVisible(false);
         const teleporter2 = this.teleporters.create(1090, 1090, 'corredorDireito').setVisible(false);
 
-        // ==========================================
-        // 3. COLISÕES E CÂMERA
-        // ==========================================
         if (layerLimites) this.physics.add.collider(this.jogadorAtual, layerLimites);
         if (layerObjetos) this.physics.add.collider(this.jogadorAtual, layerObjetos);
 
@@ -150,55 +134,37 @@ export class Mapa3 extends Scene {
 
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.cameras.main.startFollow(this.jogadorAtual);
+        this.cameras.main.setZoom(1);
 
-        // ==========================================
-        // 4. ANIMAÇÕES
-        // ==========================================
-        if (!this.anims.exists('walk')) {
-            this.anims.create({ key: 'walk', frames: this.anims.generateFrameNumbers('solar_andando', { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
-        }
-        if (!this.anims.exists('run')) {
-            this.anims.create({ key: 'run', frames: this.anims.generateFrameNumbers('solar_correndo', { start: 1, end: 2 }), frameRate: 15 });
-        }
-        if (!this.anims.exists('jump')) {
-            this.anims.create({ key: 'jump', frames: this.anims.generateFrameNumbers('solar_pulando', { start: 2, end: 2 }), frameRate: 100 });
-        }
-        if (!this.anims.exists('fall')) {
-            this.anims.create({ key: 'fall', frames: this.anims.generateFrameNumbers('solar_caindo', { start: 2, end: 2 }), frameRate: 10 });
-        }
-        if (!this.anims.exists('wallSlide')) {
-            this.anims.create({ key: 'wallSlide', frames: this.anims.generateFrameNumbers('solar_deslizando', { start: 1, end: 1 }), frameRate: 10 });
-        }
+        if (!this.anims.exists('walk')) this.anims.create({ key: 'walk', frames: this.anims.generateFrameNumbers('solar_andando', { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
+        if (!this.anims.exists('run')) this.anims.create({ key: 'run', frames: this.anims.generateFrameNumbers('solar_correndo', { start: 1, end: 2 }), frameRate: 15 });
+        if (!this.anims.exists('jump')) this.anims.create({ key: 'jump', frames: this.anims.generateFrameNumbers('solar_pulando', { start: 2, end: 2 }), frameRate: 100 });
+        if (!this.anims.exists('fall')) this.anims.create({ key: 'fall', frames: this.anims.generateFrameNumbers('solar_caindo', { start: 2, end: 2 }), frameRate: 10 });
+        if (!this.anims.exists('wallSlide')) this.anims.create({ key: 'wallSlide', frames: this.anims.generateFrameNumbers('solar_deslizando', { start: 1, end: 1 }), frameRate: 10 });
 
-        // ==========================================
-        // 5. CONTROLES E EVENTOS NATIVOS
-        // ==========================================
         this.cursors = this.input.keyboard.createCursorKeys();
         this.jaEstaSaindo = false;
 
         this.input.keyboard.on('keydown', (event) => {
             if (this.jaEstaSaindo) return;
-
-            // Alternar modo escuro com a tecla E
             if (event.key === 'e' || event.key === 'E') {
                 this.escuroAtivo = !this.escuroAtivo;
-                if (this.escuridaoSprite) {
-                    this.escuridaoSprite.setVisible(this.escuroAtivo);
-                }
+                if (this.escuridaoSprite) this.escuridaoSprite.setVisible(this.escuroAtivo);
             }
         });
 
-        // Adiciona a estética de monitor no final
+        // CONTAINER TRAVADO NA TELA
+        this.uiContainer = this.add.container(0, 0).setDepth(190);
+        this.uiContainer.setScrollFactor(0);
         this.adicionarFiltroVisao();
     }
 
     adicionarFiltroVisao() {
         const sw = this.scale.width;
         const sh = this.scale.height;
-        const uiContainer = this.add.container(0, 0).setScrollFactor(0).setDepth(190);
+        const uiContainer = this.uiContainer;
 
         if (this.personagemInicial === 'solar') {
-            // --- VISÃO SOLAR (Futurista / Cyan / Paineis Solares) ---
             if (!this.textures.exists('vinheta_solar')) {
                 const canvas = this.textures.createCanvas('vinheta_solar', sw, sh);
                 const ctx = canvas.context;
@@ -211,21 +177,17 @@ export class Mapa3 extends Scene {
             }
             uiContainer.add(this.add.image(0, 0, 'vinheta_solar').setOrigin(0,0));
 
-            // Grid Fotovoltaico do Painel Solar
             if (!this.textures.exists('grid_solar')) {
                 const gridCanvas = this.textures.createCanvas('grid_solar', sw, sh);
                 const ctx = gridCanvas.context;
-                
                 ctx.strokeStyle = 'rgba(0, 243, 255, 0.03)';
                 ctx.lineWidth = 1;
                 for (let x = 0; x < sw; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sh); ctx.stroke(); }
                 for (let y = 0; y < sh; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sw, y); ctx.stroke(); }
-                
                 ctx.strokeStyle = 'rgba(0, 243, 255, 0.08)';
                 ctx.lineWidth = 2;
                 for (let x = 0; x < sw; x += 120) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sh); ctx.stroke(); }
                 for (let y = 0; y < sh; y += 120) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sw, y); ctx.stroke(); }
-                
                 gridCanvas.refresh();
             }
             uiContainer.add(this.add.image(0, 0, 'grid_solar').setOrigin(0,0));
@@ -243,9 +205,7 @@ export class Mapa3 extends Scene {
             g.fillCircle(sw/2, 20, 2); g.fillCircle(sw/2, sh - 20, 2);
             g.fillCircle(20, sh/2, 2); g.fillCircle(sw - 20, sh/2, 2);
             uiContainer.add(g);
-
         } else {
-            // --- VISÃO FORNALHA (Ferrugem / Amarelado / Retalho) ---
             if (!this.textures.exists('vinheta_fornalha')) {
                 const canvas = this.textures.createCanvas('vinheta_fornalha', sw, sh);
                 const ctx = canvas.context;
@@ -259,28 +219,23 @@ export class Mapa3 extends Scene {
             uiContainer.add(this.add.image(0, 0, 'vinheta_fornalha').setOrigin(0,0));
 
             let g = this.add.graphics();
-
             const drawScrap = (x, y, multX, multY) => {
                 g.fillStyle(0x2d170e, 0.9);
                 g.beginPath();
                 g.moveTo(x, y); g.lineTo(x + (120 * multX), y); g.lineTo(x, y + (120 * multY));
                 g.closePath(); g.fillPath();
-
                 g.fillStyle(0x4a1c11, 0.95);
                 g.beginPath();
                 g.moveTo(x, y); g.lineTo(x + (75 * multX), y); g.lineTo(x, y + (75 * multY));
                 g.closePath(); g.fillPath();
-
                 g.fillStyle(0x6b2b11, 1);
                 g.fillRect(multX > 0 ? x : x - 20, multY > 0 ? y : y - 90, 20, 90);
                 g.fillRect(multX > 0 ? x : x - 90, multY > 0 ? y : y - 20, 90, 20);
-
                 g.fillStyle(0x8a9294, 1);
                 g.fillCircle(x + (12 * multX), y + (12 * multY), 4);
                 g.fillCircle(x + (45 * multX), y + (10 * multY), 3);
                 g.fillCircle(x + (10 * multX), y + (45 * multY), 3);
             };
-
             drawScrap(0, 0, 1, 1);
             drawScrap(sw, 0, -1, 1);
             drawScrap(0, sh, 1, -1);
@@ -303,7 +258,6 @@ export class Mapa3 extends Scene {
     update() {
         if (this.jaEstaSaindo) return;
 
-        // ⚙️ DETECÇÃO DE QUEDA E RENASCIMENTO
         const limiteQueda = this.mapaAlturaTotal + 20;
         
         if (this.jogadorAtual && this.jogadorAtual.y > limiteQueda && !this.jogadorAtual.estaRenascendo) {
@@ -316,7 +270,6 @@ export class Mapa3 extends Scene {
                 this.sound.play('caindo');
             }
 
-            this.cameras.main.stopFollow();
             this.jogadorAtual.setVisible(false);
             if (this.jogadorAtual.body) this.jogadorAtual.body.setEnable(false);
 
@@ -332,24 +285,21 @@ export class Mapa3 extends Scene {
                 this.jogadorAtual.setVisible(true);
                 if (this.jogadorAtual.body) this.jogadorAtual.body.setEnable(true);
                 this.jogadorAtual.estaRenascendo = false;
-
-                this.cameras.main.startFollow(this.jogadorAtual);
             });
         }
 
         const activePlayer = this.jogadorAtual;
         if (!activePlayer || !activePlayer.body || activePlayer.estaRenascendo) return;
 
-        // ATUALIZAÇÃO DA POSIÇÃO DO FURO DE LUZ
         if (this.escuroAtivo && this.escuridaoSprite) {
             this.escuridaoSprite.setPosition(activePlayer.x, activePlayer.y);
         }
 
-        // Envia a posição atual para o servidor
         if (this.socket) {
-            this.socket.emit('enviarPosicao', {
-                x: activePlayer.x,
-                y: activePlayer.y
+            this.socket.emit('enviarPosicao', { 
+                x: activePlayer.x, 
+                y: activePlayer.y,
+                cena: this.scene.key
             });
         }
 
@@ -364,11 +314,7 @@ export class Mapa3 extends Scene {
         let tentouPular = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space) || this.apertouW.isDown;
         let estaCorrendo = this.apertouShift.isDown;
 
-        // ==========================================
-        // MAPEAMENTO HÍBRIDO (SNES + Xbox/PlayStation)
-        // ==========================================
         const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
-
         const isBtnPressed = (padObj, index) => {
             if (!padObj || !padObj.buttons || !padObj.buttons[index]) return false;
             return padObj.buttons[index].pressed || padObj.buttons[index].value > 0.5;
@@ -379,17 +325,9 @@ export class Mapa3 extends Scene {
             if (axisX < -0.2 || pad.left || isBtnPressed(pad, 14)) indoEsquerda = true;
             if (axisX > 0.2 || pad.right || isBtnPressed(pad, 15)) indoDireita = true;
 
-            // PULAR: SNES (index 2) OU Moderno A/Cross (index 0 / pad.A)
-            if (isBtnPressed(pad, 2) || isBtnPressed(pad, 0) || pad.A) {
-                tentouPular = true;
-            }
+            if (isBtnPressed(pad, 2) || isBtnPressed(pad, 0) || pad.A) tentouPular = true;
+            if (isBtnPressed(pad, 6) || isBtnPressed(pad, 3) || isBtnPressed(pad, 7) || (pad.R2 && pad.R2 > 0.1)) estaCorrendo = true;
 
-            // CORRER: SNES (index 6, 3) OU Moderno RT/R2 (index 7 / pad.R2)
-            if (isBtnPressed(pad, 6) || isBtnPressed(pad, 3) || isBtnPressed(pad, 7) || (pad.R2 && pad.R2 > 0.1)) {
-                estaCorrendo = true;
-            }
-
-            // CANCELAR / VOLTAR: Botão B moderno ou A do SNES (index 1) ou SELECT (index 8)
             if (isBtnPressed(pad, 1) || isBtnPressed(pad, 8)) {
                 if (this.scene.isActive('Mapa3')) {
                     this.scene.stop('Mapa3');
@@ -442,11 +380,9 @@ export class Mapa3 extends Scene {
 
     completouFase(jogador, teleportador) {
         if (this.jaEstaSaindo) return;
-
         const quemMarcouPonto = this.personagemInicial; 
-
         const dadosTransicao = {
-            proximaCena: 'Mapa4',
+            proximaCena: 'Creditos',
             personagem: this.personagemInicial,
             pontosSolar: this.pontosSolar,
             pontosFornalha: this.pontosFornalha,
@@ -468,12 +404,11 @@ export class Mapa3 extends Scene {
     irParaProximaFaseDireto() {
         if (this.jaEstaSaindo) return;
         this.jaEstaSaindo = true;
-
         this.cameras.main.fadeOut(500, 0, 0, 0);
         this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
             if (this.scene.isActive('Mapa3')) {
                 this.scene.stop('Mapa3');
-                this.scene.start('Mapa4', { personagem: this.personagemInicial });
+                this.scene.start('Creditos', { personagem: this.personagemInicial });
             }
         });
     }
