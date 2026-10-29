@@ -389,28 +389,60 @@ export class Game extends Scene {
         const isFalling = body.velocity.y > 0;
         const estaNaParede = isTouchingWall && !noChao && isFalling;
 
-        let executouWallJump = false;
-        const velocidadeX = estaCorrendo ? 260 : 160; 
+        const velocidadeMax = estaCorrendo ? 260 : 160; 
         const impulsoParedeX = estaCorrendo ? 320 : 220; 
 
+        // 1. PULO NORMAL E DESLIZE
         if (tentouPular && noChao) {
             activePlayer.setVelocityY(-400); 
             if (this.somPulando) this.somPulando.play({ volume: 0.4 * volSFX });
         }
         if (estaNaParede) activePlayer.setVelocityY(50); 
 
+        // 2. PULO NA PAREDE CORRIGIDO
         if (tentouPular && estaNaParede) {
-            executouWallJump = true;
-            if (indoDireita) { activePlayer.setVelocityX(impulsoParedeX); activePlayer.setVelocityY(-380); }
-            else if (indoEsquerda) { activePlayer.setVelocityX(-impulsoParedeX); activePlayer.setVelocityY(-380); }
+            // Verifica a FÍSICA da parede tocada (body.blocked), ignorando o botão apertado
+            if (body.blocked.left) {
+                // Parede está à esquerda -> Lança para a DIREITA
+                activePlayer.setVelocityX(impulsoParedeX); 
+                activePlayer.setVelocityY(-380);
+                activePlayer.setFlipX(false);
+            } else if (body.blocked.right) {
+                // Parede está à direita -> Lança para a ESQUERDA
+                activePlayer.setVelocityX(-impulsoParedeX); 
+                activePlayer.setVelocityY(-380);
+                activePlayer.setFlipX(true);
+            }
             if (this.somPulando) this.somPulando.play({ volume: 0.4 * volSFX });
         }
 
-        if (!executouWallJump) {
-            if (indoEsquerda) { activePlayer.setVelocityX(-velocidadeX); activePlayer.setFlipX(true); } 
-            else if (indoDireita) { activePlayer.setVelocityX(velocidadeX); activePlayer.setFlipX(false); } 
-            else { activePlayer.setVelocityX(0); }
+        // 3. SISTEMA DE ACELERAÇÃO (MOMENTUM ESTILO SUPER MARIO WORLD)
+        let vx = activePlayer.body.velocity.x;
+        
+        // Ajuste estes valores para deixar o personagem mais "pesado" ou "escorregadio"
+        const aceleracao = noChao ? 18 : 10; // Acelera mais rápido no chão, tem mais inércia no ar
+        const atrito = noChao ? 25 : 5;      // Atrito forte no chão, no ar demora para virar (air control)
+
+        if (indoEsquerda) {
+            vx -= aceleracao;
+            if (vx < -velocidadeMax) vx = -velocidadeMax;
+            activePlayer.setFlipX(true);
+        } else if (indoDireita) {
+            vx += aceleracao;
+            if (vx > velocidadeMax) vx = velocidadeMax;
+            activePlayer.setFlipX(false);
+        } else {
+            // Atrito aplicado quando o jogador solta o analógico/teclado (Mario derrapando até parar)
+            if (vx > 0) {
+                vx -= atrito;
+                if (vx < 0) vx = 0;
+            } else if (vx < 0) {
+                vx += atrito;
+                if (vx > 0) vx = 0;
+            }
         }
+
+        activePlayer.setVelocityX(vx);
 
         const char = this.personagemInicial; 
 
