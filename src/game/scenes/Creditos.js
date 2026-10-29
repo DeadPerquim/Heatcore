@@ -23,6 +23,11 @@ export class Creditos extends Scene {
       this.add.image(0, 0, 'fundo_lab_creditos').setOrigin(0, 0).setDepth(0);
     }
 
+    let somAmbiente = this.sound.get('ambientacao');
+    if (somAmbiente && somAmbiente.isPlaying) {
+        somAmbiente.stop();
+    }
+
     // Luzes ambiente pulsantes
     this.glowAmber = this.add.circle(width * 0.25, height * 0.5, 240, 0xff5500, 0.12)
         .setBlendMode(Phaser.BlendModes.ADD)
@@ -79,7 +84,7 @@ export class Creditos extends Scene {
     // ==========================================
     // 2. HUD INDUSTRIAL E BOTÃO VOLTAR
     // ==========================================
-    this.add.text(30, 25, "MODULE // CREDITS_ARCHIVE", {
+    this.add.text(30, 25, "MODULO // ARQUIVO_CREDITOS", {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#00f3ff"
     }).setAlpha(0.6).setDepth(200);
 
@@ -102,12 +107,12 @@ export class Creditos extends Scene {
     this.btnVoltar.on('pointerdown', () => this.voltarParaMenu());
 
     // ==========================================
-    // 3. IMAGEM DO TÍTULO FIXA NO TOPO (MÁXIMA PROFUNDIDADE)
+    // 3. IMAGEM DO TÍTULO FIXA NO TOPO
     // ==========================================
     const topoY = 85;
 
-    // Fundo escuro atrás do título para bloqueio visual adicional
-    this.add.rectangle(width / 2, topoY, width, 160, 0x080910, 0.95).setDepth(140);
+    // Fundo totalmente opaco (alpha 1) para bloquear texto vazando
+    this.add.rectangle(width / 2, 80, width, 180, 0x080910, 1).setDepth(140);
 
     this.logoGlow = this.add.circle(width / 2, topoY, 95, 0xff6600, 0.22)
         .setBlendMode(Phaser.BlendModes.ADD)
@@ -116,7 +121,6 @@ export class Creditos extends Scene {
     if (this.textures.exists('logo_heatcore')) {
       this.logoHeader = this.add.image(width / 2, topoY, 'logo_heatcore')
           .setScale(0.52)
-          .setBlendMode(Phaser.BlendModes.SCREEN)
           .setDepth(151);
     } else {
       this.logoHeader = this.add.text(width / 2, topoY, "HEATCORE", {
@@ -124,7 +128,6 @@ export class Creditos extends Scene {
       }).setOrigin(0.5).setDepth(151);
     }
 
-    // Linha divisória sob o título
     let linhaTitulo = this.add.graphics().setDepth(152);
     linhaTitulo.lineStyle(2, 0xff9900, 0.7);
     linhaTitulo.lineBetween((width / 2) - 180, 150, (width / 2) + 180, 150);
@@ -132,11 +135,10 @@ export class Creditos extends Scene {
     // ==========================================
     // 4. CRÉDITOS ROLANTES COM MÁSCARA ISOLADA
     // ==========================================
-    this.limiteTopo = 160; 
+    this.limiteTopo = 165; 
     const limiteRodape = height - 50; 
     const alturaJanela = limiteRodape - this.limiteTopo;
 
-    // Máscara Geométrica embutida
     const maskGraphics = this.make.graphics({ add: false });
     maskGraphics.fillStyle(0xffffff);
     maskGraphics.fillRect(0, this.limiteTopo, width, alturaJanela);
@@ -152,7 +154,7 @@ export class Creditos extends Scene {
       },
       {
         titulo: "PROGRAMAÇÃO & GAMEPLAY",
-        nomes: ["[ GABRIEL FERREIRA DE SOUZA DA SILVA ]", "[ DANIEL ]"]
+        nomes: ["[ GABRIEL FERREIRA DE SOUZA DA SILVA ]", "[ DANIEL BENTES PERQUIM ]"]
       },
       {
         titulo: "ARTE & ANIMAÇÃO 2D",
@@ -160,7 +162,7 @@ export class Creditos extends Scene {
       },
       {
         titulo: "DESIGN DE NÍVEIS (LEVEL DESIGN)",
-        nomes: ["[ DANIEL ]"]
+        nomes: ["[ DANIEL BENTES PERQUIM ]"]
       },
       {
         titulo: "ARQUITETURA MULTIPLAYER & REDE",
@@ -168,11 +170,11 @@ export class Creditos extends Scene {
       },
       {
         titulo: "MÚSICA & DESIGN DE SOM (SFX)",
-        nomes: ["[ DANIEL ]"]
+        nomes: ["[ DANIEL BENTES PERQUIM ]"]
       },
       {
         titulo: "GARANTIA DE QUALIDADE (QA & TESTES)",
-        nomes: ["[ GABRIEL FERREIRA DE SOUZA DA SILVA ]", "[ DANIEL ]"]
+        nomes: ["[ GABRIEL FERREIRA DE SOUZA DA SILVA ]", "[ DANIEL BENTES PERQUIM ]"]
       },
       {
         titulo: "TECNOLOGIAS UTILIZADAS",
@@ -217,31 +219,72 @@ export class Creditos extends Scene {
     });
 
     this.alturaTotalCreditos = offsetY;
-    this.velocidadeRolagem = 42;
+    
+    // ==========================================
+    // CONTROLES DE VELOCIDADE FLUIDA
+    // ==========================================
+    this.velocidadeRolagemBase = 25;
+    this.velocidadeRolagemRapida = 160;
+    this.velocidadeRolagemAtual = this.velocidadeRolagemBase; // Começa na velocidade normal
 
     this.teclaEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    this.teclaEspaco = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.teclaShift = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    this.teclaEnter = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    
     this.jaSaindo = false;
   }
 
   update(time, delta) {
     if (this.jaSaindo) return;
 
-    if (Phaser.Input.Keyboard.JustDown(this.teclaEsc)) {
-      this.voltarParaMenu();
-      return;
+    // --- Mapeamento Híbrido Nativo ---
+    const pad = this.input.gamepad ? (this.input.gamepad.pad1 || this.input.gamepad.getPad(0)) : null;
+
+    const isBtnPressed = (padObj, index) => {
+        if (padObj && padObj.buttons && padObj.buttons[index]) {
+            const btn = padObj.buttons[index];
+            if (typeof btn === 'object' && (btn.pressed || btn.value > 0.5)) return true;
+            if (typeof btn === 'number' && btn > 0.5) return true;
+        }
+        if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+            const rawPads = navigator.getGamepads();
+            for (let i = 0; i < rawPads.length; i++) {
+                const rp = rawPads[i];
+                if (rp && rp.buttons && rp.buttons[index]) {
+                    const btn = rp.buttons[index];
+                    if (typeof btn === 'object' && (btn.pressed || btn.value > 0.5)) return true;
+                    if (typeof btn === 'number' && btn > 0.5) return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    // 1. Lógica para SAIR (Voltar/Sair/Select/Start ou B1(B))
+    if (Phaser.Input.Keyboard.JustDown(this.teclaEsc) || isBtnPressed(pad, 1) || isBtnPressed(pad, 8) || isBtnPressed(pad, 9)) {
+        this.voltarParaMenu();
+        return;
     }
 
-    const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
-    if (pad && (pad.B || (pad.buttons.length > 1 && pad.buttons[1].pressed))) {
-      this.voltarParaMenu();
-      return;
+    // 2. Lógica para ACELERAR (Espaço/Shift/Enter ou B0/B2)
+    let acelerando = this.teclaEspaco.isDown || this.teclaShift.isDown || this.teclaEnter.isDown;
+    if (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || (pad && pad.A)) {
+        acelerando = true;
     }
 
+    // 3. Aplicação do Efeito de Aceleração/Desaceleração Fluida (Lerp)
+    const velocidadeAlvo = acelerando ? this.velocidadeRolagemRapida : this.velocidadeRolagemBase;
+    
+    // O valor 0.08 define quão 'pesado' é o letreiro (menor = demora mais pra acelerar/frear, maior = responde mais seco)
+    this.velocidadeRolagemAtual += (velocidadeAlvo - this.velocidadeRolagemAtual) * 0.08;
+
+    // 4. Movimenta o Container
     const deltaSegundos = delta / 1000;
-    this.containerCreditos.y -= this.velocidadeRolagem * deltaSegundos;
+    this.containerCreditos.y -= this.velocidadeRolagemAtual * deltaSegundos;
 
-    // Quando todos os créditos passarem do topo da máscara, retorna automaticamente ao MainMenu
-    if (this.containerCreditos.y < this.limiteTopo - this.alturaTotalCreditos) {
+    // 5. Verifica se os créditos terminaram de rolar
+    if (this.containerCreditos.y < this.limiteTopo - this.alturaTotalCreditos - 150) {
       this.voltarParaMenu();
     }
   }

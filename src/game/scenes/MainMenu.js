@@ -6,14 +6,66 @@ export class MainMenu extends Scene {
     super("MainMenu");
   }
 
+  // ==========================================
+  // FUNÇÕES AUXILIARES DE SOM
+  // ==========================================
+  desbloquearAudioNavegador() {
+    if (this.sound && this.sound.context && this.sound.context.state === 'suspended') {
+      this.sound.context.resume();
+    }
+  }
+
+  tocarSomMudarOpcao() {
+    this.desbloquearAudioNavegador();
+    if (this.cache.audio.exists('sfx_mudar_opcao')) {
+      const vol = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
+      this.sound.play('sfx_mudar_opcao', { volume: vol });
+    }
+  }
+
+  tocarSomBotaoCurto() {
+    this.desbloquearAudioNavegador();
+    if (this.cache.audio.exists('sfx_clicar_botao')) {
+      const vol = (this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7) * 0.5;
+      this.sound.play('sfx_clicar_botao', { volume: vol });
+    }
+  }
+
+  tocarSomSelecaoPersonagem() {
+    this.desbloquearAudioNavegador();
+    if (this.cache.audio.exists('sfx_clicar_botao')) {
+      const vol = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
+      this.sound.play('sfx_clicar_botao', { volume: vol });
+    }
+  }
+
   create() {
     const { width, height } = this.scale;
 
     // ==========================================
-    // 0. CONFIGURAÇÃO GLOBAL DE ÁUDIO
+    // 0. CONFIGURAÇÃO GLOBAL DE ÁUDIO & DESBLOQUEIO
     // ==========================================
     if (this.game.volumeMusica === undefined) this.game.volumeMusica = 0.5;
     if (this.game.volumeSFX === undefined) this.game.volumeSFX = 0.7;
+
+    // Garante que qualquer clique ou tecla destrave o áudio no navegador
+    this.input.on('pointerdown', () => this.desbloquearAudioNavegador());
+    this.input.keyboard.on('keydown', () => this.desbloquearAudioNavegador());
+
+    // Inicializa os ponteiros no índice 0 para não disparar som automático ao criar a cena
+    this.ultimoSelectedIndex = 0;
+    this.ultimoDiarioIndex = 0;
+    this.ultimoOpcoesIndex = 0;
+    this.ultimoOverlayIndex = 0;
+
+    // Diagnóstico no F12 Console para verificar carregamento
+    console.log("🔊 Status Áudio MudarOpção:", this.cache.audio.exists('sfx_mudar_opcao'));
+    console.log("🔊 Status Áudio ClicarBotão:", this.cache.audio.exists('sfx_clicar_botao'));
+
+    let somAmbiente = this.sound.get('ambientacao');
+        if (somAmbiente && somAmbiente.isPlaying) {
+            somAmbiente.stop();
+        }
 
     // ==========================================
     // 0.1 CONEXÃO COM O SERVIDOR MULTIPLAYER
@@ -48,7 +100,7 @@ export class MainMenu extends Scene {
     });
 
     // ==========================================
-    // 1. FUNDO DE LABORATÓRIO
+    // 1. FUNDO DE LABORATÓRIO E BRILHO
     // ==========================================
     if (!this.textures.exists('fundo_lab_pro')) {
       const bgCanvas = this.textures.createCanvas('fundo_lab_pro', width, height);
@@ -73,12 +125,14 @@ export class MainMenu extends Scene {
       }
     }
 
-    this.add.image(0, 0, 'fundo_lab_pro').setOrigin(0, 0);
+    this.add.image(0, 0, 'fundo_lab_pro').setOrigin(0, 0).setDepth(0);
 
     this.glowAmber = this.add.circle(width * 0.32, height * 0.42, 260, 0xff5500, 0.12)
-        .setBlendMode(Phaser.BlendModes.ADD);
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(1);
     this.glowCyan = this.add.circle(width * 0.8, height * 0.7, 220, 0x00f3ff, 0.06)
-        .setBlendMode(Phaser.BlendModes.ADD);
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(1);
 
     this.tweens.add({
       targets: this.glowAmber,
@@ -118,7 +172,7 @@ export class MainMenu extends Scene {
       quantity: 1,
       frequency: 220,
       blendMode: 'ADD'
-    });
+    }).setDepth(2);
 
     if (this.cache.audio.exists('menu')) {
       if (!this.sound.get('menu')) {
@@ -137,17 +191,17 @@ export class MainMenu extends Scene {
     const corHud = "#00f3ff";
     this.add.text(30, 25, "SYS_STATUS // ONLINE", {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: corHud
-    }).setAlpha(0.6);
+    }).setAlpha(0.6).setDepth(20);
 
     this.add.text(30, 42, "FACILITY: SUB_LEVEL_02", {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
-    }).setAlpha(0.5);
+    }).setAlpha(0.5).setDepth(20);
 
-    this.add.text(width - 30, height - 30, "HEATCORE v1.1.0 - MODOS DIÁRIOS", {
+    this.add.text(width - 30, height - 30, "HEATCORE v1.3.0 - ALPHA", {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
-    }).setOrigin(1, 1).setAlpha(0.5);
+    }).setOrigin(1, 1).setAlpha(0.5).setDepth(20);
 
-    let linhaHud = this.add.graphics();
+    let linhaHud = this.add.graphics().setDepth(20);
     linhaHud.lineStyle(1, 0x00f3ff, 0.3);
     linhaHud.lineBetween(30, 60, 220, 60);
 
@@ -158,13 +212,14 @@ export class MainMenu extends Scene {
     this.logoInicialY = height * 0.415;
 
     this.logoGlow = this.add.circle(this.logoInicialX, this.logoInicialY, 140, 0xff6600, 0.25)
-        .setBlendMode(Phaser.BlendModes.ADD);
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(3);
 
     this.logo = this.add.image(this.logoInicialX, this.logoInicialY - 50, 'logo_heatcore')
         .setOrigin(0.5)
         .setScale(0.82)
         .setAlpha(0)
-        .setBlendMode(Phaser.BlendModes.SCREEN);
+        .setDepth(10);
 
     this.tweens.add({
       targets: [this.logo, this.logoGlow],
@@ -191,14 +246,15 @@ export class MainMenu extends Scene {
 
     this.selectedIndex = 0; 
     this.btnObjects = [];
-    this.estadoMenu = "MAIN"; // MAIN | SUBMENU_DIARIO | OPTIONS
+    this.estadoMenu = "MAIN";
 
     this.btnHighlightBg = this.add.rectangle(this.baseMenuX + 20, this.startY, 310, 48, 0xff9900, 0.15)
         .setOrigin(1, 0.5)
         .setStrokeStyle(1.5, 0xff9900, 0.8)
-        .setAlpha(0);
+        .setAlpha(0)
+        .setDepth(15);
 
-    this.containerBotoesMenu = this.add.container(0, 0);
+    this.containerBotoesMenu = this.add.container(0, 0).setDepth(20);
 
     this.menuOptions.forEach((option, index) => {
       let btnContainer = this.add.container(this.baseMenuX + 100, this.startY + (index * 75));
@@ -234,6 +290,7 @@ export class MainMenu extends Scene {
 
       btnContainer.on('pointerdown', () => {
         if (!this.overlayAtivo && this.estadoMenu === "MAIN") {
+          this.tocarSomBotaoCurto();
           option.action();
         }
       });
@@ -242,7 +299,7 @@ export class MainMenu extends Scene {
       this.containerBotoesMenu.add(btnContainer);
     });
 
-    // Controles
+    // Controles Teclado
     this.keyUp = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
     this.keyDown = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
     this.keyLeft = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
@@ -257,6 +314,7 @@ export class MainMenu extends Scene {
     this.jaIniciou = false;
     this.overlayAtivo = false;
     this.inputCooldown = 0; 
+    this.ultimoToggleFullscreen = 0;
 
     this.criarSubmenuDiario();
     this.criarMenuOpcoes();
@@ -272,13 +330,10 @@ export class MainMenu extends Scene {
     });
   }
 
-  // ==========================================
-  // CONSTRUÇÃO DO SUBMENU DE MAPAS DIÁRIOS
-  // ==========================================
   criarSubmenuDiario() {
     const posX = this.baseMenuX + 350; 
 
-    this.containerSubmenuDiario = this.add.container(posX, this.startY - 10).setAlpha(0);
+    this.containerSubmenuDiario = this.add.container(posX, this.startY - 10).setAlpha(0).setDepth(20);
 
     const tituloDiario = this.add.text(0, -10, "// ESCOLHA O DESAFIO DIÁRIO", {
       fontFamily: "'Courier New', Courier, monospace",
@@ -315,6 +370,7 @@ export class MainMenu extends Scene {
 
       btnTxt.on('pointerdown', () => {
         if (this.estadoMenu === "SUBMENU_DIARIO") {
+          this.tocarSomBotaoCurto();
           this.confirmarOpcaoDiario();
         }
       });
@@ -330,6 +386,7 @@ export class MainMenu extends Scene {
     this.estadoMenu = "SUBMENU_DIARIO";
     this.inputCooldown = 250;
     this.diarioIndex = 0;
+    this.ultimoDiarioIndex = 0;
     this.atualizarSelecaoDiario();
 
     this.tweens.add({ targets: this.btnHighlightBg, alpha: 0, duration: 150 });
@@ -379,6 +436,11 @@ export class MainMenu extends Scene {
   }
 
   atualizarSelecaoDiario() {
+    if (this.ultimoDiarioIndex !== this.diarioIndex) {
+      this.tocarSomMudarOpcao();
+      this.ultimoDiarioIndex = this.diarioIndex;
+    }
+
     this.btnObjetosDiario.forEach((btn, index) => {
       const isSelected = index === this.diarioIndex;
       if (isSelected) {
@@ -409,13 +471,10 @@ export class MainMenu extends Scene {
     });
   }
 
-  // ==========================================
-  // MENU DE OPÇÕES
-  // ==========================================
   criarMenuOpcoes() {
     const posX = this.baseMenuX + 350; 
 
-    this.containerOpcoes = this.add.container(posX, this.startY - 30).setAlpha(0);
+    this.containerOpcoes = this.add.container(posX, this.startY - 30).setAlpha(0).setDepth(20);
 
     const tituloOpcoes = this.add.text(0, 0, "// AJUSTES DO SISTEMA", {
       fontFamily: "'Courier New', Courier, monospace",
@@ -452,6 +511,7 @@ export class MainMenu extends Scene {
     });
 
     this.btnVoltarOpcoes.on('pointerdown', () => {
+      this.tocarSomBotaoCurto();
       this.fecharOpcoes();
     });
 
@@ -563,7 +623,7 @@ export class MainMenu extends Scene {
       fontSize: 15,
       color: "#ffffff",
       fontStyle: "bold"
-    }).setOrigin(0, 0.5);
+    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
 
     const estaEmTelaCheia = !!document.fullscreenElement || this.scale.isFullscreen;
     
@@ -574,14 +634,25 @@ export class MainMenu extends Scene {
       fontStyle: "bold"
     }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
 
+    const acionarToggle = () => {
+      this.tocarSomBotaoCurto();
+      this.opcoesIndex = 2;
+      this.atualizarSelecaoOpcoes();
+      onToggle();
+    };
+
+    textoRotulo.on('pointerover', () => {
+      this.opcoesIndex = 2;
+      this.atualizarSelecaoOpcoes();
+    });
+
     textoStatus.on('pointerover', () => {
       this.opcoesIndex = 2;
       this.atualizarSelecaoOpcoes();
     });
 
-    textoStatus.on('pointerdown', () => {
-      onToggle();
-    });
+    textoRotulo.on('pointerdown', acionarToggle);
+    textoStatus.on('pointerdown', acionarToggle);
 
     container.add([textoRotulo, textoStatus]);
 
@@ -590,7 +661,7 @@ export class MainMenu extends Scene {
         const ativo = !!document.fullscreenElement || this.scale.isFullscreen;
         textoStatus.setText(ativo ? "[ X ] ATIVADO" : "[   ] DESATIVADO");
         textoStatus.setColor(ativo ? "#00ff66" : "#8888aa");
-      }, 50);
+      }, 80);
     };
 
     return {
@@ -602,20 +673,28 @@ export class MainMenu extends Scene {
   }
 
   alternarTelaCheia() {
-    const estaAtivo = !!document.fullscreenElement || this.scale.isFullscreen;
+    const agora = Date.now();
+    if (this.ultimoToggleFullscreen && (agora - this.ultimoToggleFullscreen < 400)) {
+      return;
+    }
+    this.ultimoToggleFullscreen = agora;
 
-    if (estaAtivo) {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
+    const estaEmTelaCheia = !!document.fullscreenElement || this.scale.isFullscreen;
+
+    try {
+      if (estaEmTelaCheia) {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if (this.scale.stopFullscreen) {
+          this.scale.stopFullscreen();
+        }
       } else {
-        this.scale.stopFullscreen();
+        if (this.scale.startFullscreen) {
+          this.scale.startFullscreen();
+        }
       }
-    } else {
-      if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      } else {
-        this.scale.startFullscreen();
-      }
+    } catch (e) {
+      console.warn("Falha ao alternar tela cheia:", e);
     }
 
     if (this.toggleFullscreen) {
@@ -624,10 +703,22 @@ export class MainMenu extends Scene {
   }
 
   atualizarSelecaoOpcoes() {
+    if (this.ultimoOpcoesIndex !== this.opcoesIndex) {
+      this.tocarSomMudarOpcao();
+      this.ultimoOpcoesIndex = this.opcoesIndex;
+    }
+
+    this.sliderMusica.textoRotulo.setText(this.opcoesIndex === 0 ? "> MÚSICA" : "MÚSICA");
     this.sliderMusica.textoRotulo.setColor(this.opcoesIndex === 0 ? "#ff9900" : "#ffffff");
+
+    this.sliderSFX.textoRotulo.setText(this.opcoesIndex === 1 ? "> EFEITOS SONOROS" : "EFEITOS SONOROS");
     this.sliderSFX.textoRotulo.setColor(this.opcoesIndex === 1 ? "#ff9900" : "#ffffff");
+
+    this.toggleFullscreen.textoRotulo.setText(this.opcoesIndex === 2 ? "> TELA CHEIA" : "TELA CHEIA");
     this.toggleFullscreen.textoRotulo.setColor(this.opcoesIndex === 2 ? "#ff9900" : "#ffffff");
-    this.btnVoltarOpcoes.setColor(this.opcoesIndex === 3 ? "#ffffff" : "#ff9900");
+
+    this.btnVoltarOpcoes.setText(this.opcoesIndex === 3 ? "> [ VOLTAR ] <" : "[ VOLTAR ]");
+    this.btnVoltarOpcoes.setColor(this.opcoesIndex === 3 ? "#ff9900" : "#666677");
   }
 
   abrirOpcoes() {
@@ -635,6 +726,7 @@ export class MainMenu extends Scene {
     this.estadoMenu = "OPTIONS";
     this.inputCooldown = 250;
     this.opcoesIndex = 0;
+    this.ultimoOpcoesIndex = 0;
     
     if (this.toggleFullscreen) {
       this.toggleFullscreen.atualizarVisual();
@@ -736,7 +828,7 @@ export class MainMenu extends Scene {
       if (this.inputCooldown <= 0 && !this.personagensOcupados.fornalha) this.confirmarSelecao("fornalha");
     });
 
-    this.btnCancelarOverlay = this.add.text(0, painelAltura * 0.39, "[ ESC / VOLTAR ]", {
+    this.btnCancelarOverlay = this.add.text(0, painelAltura * 0.39, "[ A - VOLTAR / CANCELAR ]", {
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 14,
       color: "#ff4444",
@@ -749,7 +841,10 @@ export class MainMenu extends Scene {
     this.btnCancelarOverlay.on('pointerout', () => this.btnCancelarOverlay.setColor("#ff4444"));
 
     this.btnCancelarOverlay.on('pointerdown', () => {
-      if (this.inputCooldown <= 0) this.fecharOverlay();
+      if (this.inputCooldown <= 0) {
+        this.tocarSomBotaoCurto();
+        this.fecharOverlay();
+      }
     });
 
     this.painelGroup.add([
@@ -785,7 +880,6 @@ export class MainMenu extends Scene {
     cantoneiras.moveTo(-90, -75); cantoneiras.lineTo(-90, -90); cantoneiras.lineTo(-75, -90);
     cantoneiras.moveTo(75, -90); cantoneiras.lineTo(90, -90); cantoneiras.lineTo(90, -75);
     cantoneiras.moveTo(-90, 75); cantoneiras.lineTo(-90, 90); cantoneiras.lineTo(-75, 90);
-    cantoneiras.moveTo(75, 90); cantoneiras.lineTo(90, 90); cantoneiras.lineTo(75, 90);
     cantoneiras.strokePath();
 
     let spritePreview;
@@ -862,6 +956,7 @@ export class MainMenu extends Scene {
     this.overlayAtivo = true;
     
     this.overlayIndex = this.personagensOcupados.solar ? 1 : 0;
+    this.ultimoOverlayIndex = this.overlayIndex;
     this.inputCooldown = 350; 
     
     this.overlayContainer.setVisible(true);
@@ -894,6 +989,11 @@ export class MainMenu extends Scene {
   }
 
   atualizarVisualOverlay() {
+    if (this.ultimoOverlayIndex !== this.overlayIndex) {
+      this.tocarSomMudarOpcao();
+      this.ultimoOverlayIndex = this.overlayIndex;
+    }
+
     if (this.personagensOcupados.solar) {
       this.cardSolar.bgCard.setStrokeStyle(2, 0x22222a).setFillStyle(0x0e0e14);
       this.cardSolar.scannerGlow.setVisible(false);
@@ -944,6 +1044,8 @@ export class MainMenu extends Scene {
   confirmarSelecao(personagemEscolhido) {
     if (this.jaIniciou) return;
     
+    this.tocarSomSelecaoPersonagem();
+
     this.game.meuPersonagem = personagemEscolhido;
     this.socket.emit('selecionarPersonagem', personagemEscolhido);
 
@@ -994,7 +1096,29 @@ export class MainMenu extends Scene {
     if (this.jaIniciou) return;
 
     this.inputCooldown -= delta;
-    const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+    
+    // ==========================================
+    // MAPEAMENTO HÍBRIDO (SNES + Xbox/PlayStation)
+    // ==========================================
+    const pad = this.input.gamepad ? (this.input.gamepad.pad1 || this.input.gamepad.getPad(0)) : null;
+
+    const isBtnPressed = (padObj, buttonIndex) => {
+      if (padObj && padObj.buttons && padObj.buttons[buttonIndex]) {
+        if (padObj.buttons[buttonIndex].pressed || padObj.buttons[buttonIndex].value > 0.5) {
+          return true;
+        }
+      }
+      if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+        const rawPads = navigator.getGamepads();
+        for (let i = 0; i < rawPads.length; i++) {
+          const rp = rawPads[i];
+          if (rp && rp.buttons && rp.buttons[buttonIndex] && (rp.buttons[buttonIndex].pressed || rp.buttons[buttonIndex].value > 0.5)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
 
     if (this.overlayAtivo) {
       if (this.inputCooldown > 0) return;
@@ -1004,13 +1128,12 @@ export class MainMenu extends Scene {
       let confirmar = Phaser.Input.Keyboard.JustDown(this.keyEnter);
       let cancelar = Phaser.Input.Keyboard.JustDown(this.keyEsc);
 
-      if (pad) {
-        const axisX = pad.leftStick.x;
-        if (axisX < -0.5 || pad.left) { alternarEsq = true; this.inputCooldown = 200; } 
-        else if (axisX > 0.5 || pad.right) { alternarDir = true; this.inputCooldown = 200; }
-        if (pad.A || (pad.buttons.length > 0 && pad.buttons[0].pressed)) { confirmar = true; }
-        if (pad.B || (pad.buttons.length > 1 && pad.buttons[1].pressed)) { cancelar = true; }
-      }
+      const axisX = pad && pad.leftStick ? pad.leftStick.x : 0;
+      if (axisX < -0.5 || (pad && pad.left) || isBtnPressed(pad, 14)) { alternarEsq = true; this.inputCooldown = 200; } 
+      else if (axisX > 0.5 || (pad && pad.right) || isBtnPressed(pad, 15)) { alternarDir = true; this.inputCooldown = 200; }
+      
+      if (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || (pad && pad.A)) { confirmar = true; }
+      if (isBtnPressed(pad, 1)) { cancelar = true; }
 
       if (alternarEsq || alternarDir) {
         const proximoIndex = this.overlayIndex === 0 ? 1 : 0;
@@ -1028,6 +1151,7 @@ export class MainMenu extends Scene {
       }
 
       if (cancelar) {
+        this.tocarSomBotaoCurto();
         this.fecharOverlay();
       }
 
@@ -1037,13 +1161,12 @@ export class MainMenu extends Scene {
     if (this.estadoMenu === "SUBMENU_DIARIO") {
       let cancelar = Phaser.Input.Keyboard.JustDown(this.keyEsc);
 
-      if (pad) {
-        if (pad.B || (pad.buttons.length > 1 && pad.buttons[1].pressed) || (pad.buttons.length > 8 && pad.buttons[8].pressed)) {
-          cancelar = true;
-        }
+      if (isBtnPressed(pad, 1) || isBtnPressed(pad, 8)) {
+        cancelar = true;
       }
 
       if (cancelar) {
+        this.tocarSomBotaoCurto();
         this.fecharSubmenuDiario();
         return;
       }
@@ -1053,13 +1176,12 @@ export class MainMenu extends Scene {
         let moverBaixo = Phaser.Input.Keyboard.JustDown(this.keyDown) || Phaser.Input.Keyboard.JustDown(this.keyS);
         let confirmar = Phaser.Input.Keyboard.JustDown(this.keyEnter);
 
-        if (pad) {
-          const axisY = pad.leftStick.y;
-          if (axisY < -0.5 || pad.up) { moverCima = true; this.inputCooldown = 200; } 
-          else if (axisY > 0.5 || pad.down) { moverBaixo = true; this.inputCooldown = 200; }
-          if (pad.A || (pad.buttons.length > 0 && pad.buttons[0].pressed) || (pad.buttons.length > 9 && pad.buttons[9].pressed)) {
-            confirmar = true;
-          }
+        const axisY = pad && pad.leftStick ? pad.leftStick.y : 0;
+        if (axisY < -0.5 || (pad && pad.up) || isBtnPressed(pad, 12)) { moverCima = true; this.inputCooldown = 200; } 
+        else if (axisY > 0.5 || (pad && pad.down) || isBtnPressed(pad, 13)) { moverBaixo = true; this.inputCooldown = 200; }
+        
+        if (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || isBtnPressed(pad, 9) || (pad && pad.A)) {
+          confirmar = true;
         }
 
         if (moverCima) {
@@ -1075,6 +1197,7 @@ export class MainMenu extends Scene {
         }
 
         if (confirmar) {
+          this.tocarSomBotaoCurto();
           this.confirmarOpcaoDiario();
         }
       }
@@ -1082,7 +1205,14 @@ export class MainMenu extends Scene {
     }
 
     if (this.estadoMenu === "OPTIONS") {
-      if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
+      let cancelar = Phaser.Input.Keyboard.JustDown(this.keyEsc);
+
+      if (this.inputCooldown <= 0 && (isBtnPressed(pad, 1) || isBtnPressed(pad, 8))) {
+        cancelar = true;
+      }
+
+      if (cancelar) {
+        this.tocarSomBotaoCurto();
         this.fecharOpcoes();
         return;
       }
@@ -1093,6 +1223,27 @@ export class MainMenu extends Scene {
         let moverEsq = Phaser.Input.Keyboard.JustDown(this.keyLeft) || Phaser.Input.Keyboard.JustDown(this.keyA);
         let moverDir = Phaser.Input.Keyboard.JustDown(this.keyRight) || Phaser.Input.Keyboard.JustDown(this.keyD);
         let confirmar = Phaser.Input.Keyboard.JustDown(this.keyEnter);
+
+        const axisY = pad && pad.leftStick ? pad.leftStick.y : 0;
+        const axisX = pad && pad.leftStick ? pad.leftStick.x : 0;
+
+        if (axisY < -0.5 || (pad && pad.up) || isBtnPressed(pad, 12)) {
+          moverCima = true;
+          this.inputCooldown = 200;
+        } else if (axisY > 0.5 || (pad && pad.down) || isBtnPressed(pad, 13)) {
+          moverBaixo = true;
+          this.inputCooldown = 200;
+        }
+
+        if (axisX < -0.5 || (pad && pad.left) || isBtnPressed(pad, 14)) {
+          moverEsq = true;
+        } else if (axisX > 0.5 || (pad && pad.right) || isBtnPressed(pad, 15)) {
+          moverDir = true;
+        }
+        
+        if (isBtnPressed(pad, 2) || isBtnPressed(pad, 0) || isBtnPressed(pad, 3) || isBtnPressed(pad, 9) || (pad && pad.A)) {
+          confirmar = true;
+        }
 
         if (moverCima) {
           this.opcoesIndex--;
@@ -1107,17 +1258,27 @@ export class MainMenu extends Scene {
         }
 
         if (this.opcoesIndex === 0) {
-          if (this.keyLeft.isDown || this.keyA.isDown) this.sliderMusica.setValor(this.game.volumeMusica - 0.01);
-          if (this.keyRight.isDown || this.keyD.isDown) this.sliderMusica.setValor(this.game.volumeMusica + 0.01);
+          if (this.keyLeft.isDown || this.keyA.isDown || moverEsq) {
+            this.sliderMusica.setValor(this.game.volumeMusica - 0.01);
+          }
+          if (this.keyRight.isDown || this.keyD.isDown || moverDir) {
+            this.sliderMusica.setValor(this.game.volumeMusica + 0.01);
+          }
         } else if (this.opcoesIndex === 1) {
-          if (this.keyLeft.isDown || this.keyA.isDown) this.sliderSFX.setValor(this.game.volumeSFX - 0.01);
-          if (this.keyRight.isDown || this.keyD.isDown) this.sliderSFX.setValor(this.game.volumeSFX + 0.01);
+          if (this.keyLeft.isDown || this.keyA.isDown || moverEsq) {
+            this.sliderSFX.setValor(this.game.volumeSFX - 0.01);
+          }
+          if (this.keyRight.isDown || this.keyD.isDown || moverDir) {
+            this.sliderSFX.setValor(this.game.volumeSFX + 0.01);
+          }
         } else if (this.opcoesIndex === 2) {
           if (confirmar || moverEsq || moverDir) {
+            this.tocarSomBotaoCurto();
             this.alternarTelaCheia();
             this.inputCooldown = 250;
           }
         } else if (this.opcoesIndex === 3 && confirmar) {
+          this.tocarSomBotaoCurto();
           this.fecharOpcoes();
         }
       }
@@ -1128,15 +1289,14 @@ export class MainMenu extends Scene {
     let moverBaixo = Phaser.Input.Keyboard.JustDown(this.keyDown) || Phaser.Input.Keyboard.JustDown(this.keyS);
     let confirmar = Phaser.Input.Keyboard.JustDown(this.keyEnter);
 
-    if (pad) {
-      const axisY = pad.leftStick.y;
-      if (this.inputCooldown <= 0) {
-        if (axisY < -0.5 || pad.up) { moverCima = true; this.inputCooldown = 200; } 
-        else if (axisY > 0.5 || pad.down) { moverBaixo = true; this.inputCooldown = 200; }
-      }
-      if (this.inputCooldown <= 0 && (pad.A || (pad.buttons.length > 9 && pad.buttons[9].pressed))) {
-        confirmar = true;
-      }
+    const axisY = pad && pad.leftStick ? pad.leftStick.y : 0;
+    if (this.inputCooldown <= 0) {
+      if (axisY < -0.5 || (pad && pad.up) || isBtnPressed(pad, 12)) { moverCima = true; this.inputCooldown = 200; } 
+      else if (axisY > 0.5 || (pad && pad.down) || isBtnPressed(pad, 13)) { moverBaixo = true; this.inputCooldown = 200; }
+    }
+    
+    if (this.inputCooldown <= 0 && (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || isBtnPressed(pad, 9) || (pad && pad.A))) {
+      confirmar = true;
     }
 
     if (moverCima) {
@@ -1152,11 +1312,17 @@ export class MainMenu extends Scene {
     }
 
     if (confirmar) {
+      this.tocarSomBotaoCurto();
       this.menuOptions[this.selectedIndex].action();
     }
   }
 
   atualizarSelecaoVisual() {
+    if (this.ultimoSelectedIndex !== this.selectedIndex) {
+      this.tocarSomMudarOpcao();
+      this.ultimoSelectedIndex = this.selectedIndex;
+    }
+
     this.btnObjects.forEach((btnObj, index) => {
       const isSelected = index === this.selectedIndex;
 

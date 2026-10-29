@@ -6,149 +6,241 @@ export class Boot extends Scene {
   }
 
   preload() {
+    // Caminho exato apontando para a pasta assets/audio/sfx/menu/
+    this.load.audio('pc_ligando', 'assets/audio/sfx/menu/PCLigando.mp3');
     this.load.audio('boot_pc', 'assets/audio/sfx/Old_90s_PC_boot_sequence.wav');
 
     let bgGraphics = this.make.graphics({ add: false });
     bgGraphics.fillStyle(0x2a2a35, 1);
     bgGraphics.fillRect(0, 0, 800, 600);
     bgGraphics.generateTexture('fundo_temporario', 800, 600);
-
-    let titleGraphics = this.make.graphics({ add: false });
-    titleGraphics.fillStyle(0xff5500, 1);
-    titleGraphics.fillRect(0, 0, 350, 120);
-    titleGraphics.generateTexture('titulo_temporario', 350, 120);
   }
 
   create() {
-    // 1. FUNDO PRETO TIPO MONITOR ANTIGO
-    this.add.rectangle(0, 0, 800, 600, 0x000000).setOrigin(0, 0);
-    this.jaFoiProMenu = false;
-    this.sistemaIniciado = false;
+    const width = this.scale.width || 800;
+    const height = this.scale.height || 600;
+    const cX = width / 2;
+    const cY = height / 2;
+
+    if (this.game.volumeSFX === undefined) this.game.volumeSFX = 0.7;
 
     // ==========================================
-    // 2. TELA DE ESPERA (DESBLOQUEIO DE ÁUDIO)
+    // 1. FUNDO DO LABORATÓRIO MODERNO
     // ==========================================
-    let avisoTexto = this.add.text(400, 300, "> PRESSIONE QUALQUER TECLA, CLIQUE OU BOTÃO PARA LIGAR <", {
+    if (!this.textures.exists('fundo_lab_pro')) {
+      const bgCanvas = this.textures.createCanvas('fundo_lab_pro', width, height);
+      if (bgCanvas) {
+        const ctx = bgCanvas.context;
+        let grad = ctx.createRadialGradient(width * 0.5, height * 0.5, 80, width * 0.5, height * 0.5, width * 0.85);
+        grad.addColorStop(0, '#181a26');
+        grad.addColorStop(0.55, '#0b0c12');
+        grad.addColorStop(1, '#040406');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.025)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < width; x += 35) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+        }
+        for (let y = 0; y < height; y += 35) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+        }
+        bgCanvas.refresh();
+      }
+    }
+    
+    this.add.image(0, 0, 'fundo_lab_pro').setOrigin(0, 0).setDepth(0);
+
+    this.jaFoiProMenu = false;
+    this.sistemaIniciado = false;
+    this.podePularBios = false;
+    this.podePularComControle = false;
+    this.pcLigandoTocou = false;
+
+    // Função para tocar o som de ligar o PC de forma segura
+    const tocarPCLigando = () => {
+      if (!this.pcLigandoTocou && this.cache.audio.exists('pc_ligando')) {
+        this.pcLigandoTocou = true;
+        this.sound.play('pc_ligando', { volume: this.game.volumeSFX });
+      }
+    };
+
+    // Toca imediatamente ou no primeiro toque se o navegador tiver bloqueio de Autoplay
+    if (this.sound.locked) {
+      this.sound.once('unlocked', tocarPCLigando);
+    } else {
+      tocarPCLigando();
+    }
+
+    // ==========================================
+    // 2. TELA DE ESPERA / STANDBY
+    // ==========================================
+    let avisoTexto = this.add.text(cX, cY - 15, "SYS_STANDBY // ESPERANDO SINAL DE ATIVAÇÃO...", {
       fontFamily: "'Courier New', Courier, monospace",
-      fontSize: 14,
-      color: "#00ff00",
-      align: "center"
-    }).setOrigin(0.5);
+      fontSize: 16,
+      color: "#00f3ff",
+      align: "center",
+      shadow: { offsetX: 0, offsetY: 0, color: '#00f3ff', blur: 8, fill: true } 
+    }).setOrigin(0.5).setDepth(5);
+
+    let subTexto = this.add.text(cX, cY + 25, "[ PRESSIONE QUALQUER TECLA, BOTÃO OU CLIQUE PARA INICIAR ]", {
+        fontFamily: "'Courier New', Courier, monospace",
+        fontSize: 13,
+        color: "#8888aa",
+        align: "center"
+    }).setOrigin(0.5).setDepth(5);
 
     this.tweens.add({
       targets: avisoTexto,
       alpha: 0.2,
-      duration: 500,
+      duration: 800,
       yoyo: true,
       repeat: -1
     });
 
-    // Função central para iniciar o sistema
-    const iniciarSistema = () => {
+    // ==========================================
+    // 3. EFEITO CRT LIGANDO (RODA NA CARGA DA PÁGINA)
+    // ==========================================
+    this.crtFundo = this.add.rectangle(cX, cY, width, height, 0x000000).setDepth(1000);
+    this.crtLinha = this.add.rectangle(cX, cY, width, 4, 0xffffff).setDepth(1001).setScale(0, 1);
+
+    this.tweens.add({
+      targets: this.crtLinha,
+      scaleX: 1,
+      duration: 180,
+      ease: 'Power2',
+      onComplete: () => {
+        this.tweens.add({
+          targets: this.crtLinha,
+          scaleY: height / 2,
+          alpha: 0,
+          duration: 250,
+          ease: 'Power2'
+        });
+        this.tweens.add({
+          targets: this.crtFundo,
+          alpha: 0,
+          duration: 250,
+          ease: 'Power2'
+        });
+      }
+    });
+
+    // ==========================================
+    // 4. LÓGICA DE ATIVAÇÃO DO SISTEMA
+    // ==========================================
+    const ligarSistema = () => {
       if (this.sistemaIniciado) return;
       this.sistemaIniciado = true;
 
+      tocarPCLigando();
+
       avisoTexto.destroy();
+      subTexto.destroy();
 
       if (this.cache.audio.exists('boot_pc')) {
-          this.sound.play('boot_pc', { volume: 0.7 });
+        this.sound.play('boot_pc', { volume: 0.7 });
       }
 
       this.iniciarBios();
+
+      this.time.delayedCall(250, () => {
+        this.podePularBios = true;
+      });
     };
 
-    // Ouvintes para Rato e Teclado
-    this.input.once("pointerdown", iniciarSistema);
-    this.input.keyboard.once("keydown", iniciarSistema);
+    this.ligarSistema = ligarSistema;
 
-    // Guardamos a função num apontador da cena para ser chamada pelo Gamepad no update()
-    this.iniciarSistemaCallback = iniciarSistema;
+    this.input.once("pointerdown", ligarSistema);
+    this.input.keyboard.once("keydown", ligarSistema);
   }
 
   update() {
-    // Se o sistema ainda não arrancou, verificamos se algum botão do Gamepad foi pressionado
-    if (!this.sistemaIniciado) {
-        const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
-        if (pad) {
-            // Percorre todos os botões do comando para ver se algum está a ser premido
-            const botaoPressionado = pad.buttons.some(button => button.pressed);
-            
-            // Ou se o analógico foi mexido significativamente
-            const analogicoMovido = Math.abs(pad.leftStick.x) > 0.3 || Math.abs(pad.leftStick.y) > 0.3;
+    if (this.jaFoiProMenu) return;
 
-            if (botaoPressionado || analogicoMovido) {
-                this.iniciarSistemaCallback();
-            }
+    const pad = this.input.gamepad ? (this.input.gamepad.pad1 || this.input.gamepad.getPad(0)) : null;
+    const padPressed = pad && (
+        pad.buttons.some(b => b && (b.pressed || b.value > 0.5)) ||
+        (pad.leftStick && (Math.abs(pad.leftStick.x) > 0.3 || Math.abs(pad.leftStick.y) > 0.3))
+    );
+
+    if (!this.sistemaIniciado) {
+        if (padPressed) {
+            this.ligarSistema();
         }
-        return; // Sai do update para não executar o resto enquanto estiver na tela de espera
+        return;
     }
 
-    // Lógica normal de pular a BIOS caso já tenha iniciado
-    const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
-    if (pad && !this.jaFoiProMenu) {
-        if (pad.A || (pad.buttons.length > 9 && pad.buttons[9].pressed)) {
+    if (this.sistemaIniciado && !this.podePularComControle) {
+        if (!padPressed) {
+            this.podePularComControle = true;
+        }
+    } else if (this.sistemaIniciado && this.podePularComControle && this.podePularBios) {
+        if (padPressed) {
             this.irParaPreloader();
         }
     }
   }
 
   iniciarBios() {
-    let linhasTV = this.make.graphics({ add: false });
-    linhasTV.fillStyle(0x000000, 0.4); 
-    for (let i = 0; i < 600; i += 4) {
-        linhasTV.fillRect(0, i, 800, 2);
-    }
-    linhasTV.generateTexture('scanlines', 800, 600);
-    this.add.image(0, 0, 'scanlines').setOrigin(0, 0).setDepth(10);
+    const width = this.scale.width || 800;
+    const height = this.scale.height || 600;
 
-    let crtFlicker = this.add.rectangle(0, 0, 800, 600, 0x00ff00, 0.015).setOrigin(0, 0).setDepth(11);
+    let linhasTV = this.make.graphics({ add: false });
+    linhasTV.fillStyle(0x000000, 0.15); 
+    for (let i = 0; i < height; i += 4) {
+        linhasTV.fillRect(0, i, width, 2);
+    }
+    linhasTV.generateTexture('scanlines_modernas', width, height);
+    this.add.image(0, 0, 'scanlines_modernas').setOrigin(0, 0).setDepth(10);
+
+    let crtFlicker = this.add.rectangle(0, 0, width, height, 0x00f3ff, 0.02).setOrigin(0, 0).setDepth(11);
     this.tweens.add({
         targets: crtFlicker,
-        alpha: 0.04,
-        duration: 70,
+        alpha: 0.05,
+        duration: 80,
         yoyo: true,
         repeat: -1
     });
 
     const linhasDoTerminal = [
-      "Award Modular BIOS v4.51PG, An Energy Star Ally",
-      "Copyright (C) 2042-56, Award Software, Inc.",
+      "HEATCORE FACILITY O.S. v7.2 - KERNEL INITIALIZATION",
+      "Copyright (C) 2026-2042, Heatcore Industries.",
       "",
-      "PENTIUM-S CPU at 1260MHz (Overclocked to 18200MHz)",
-      "Memory Test :  640GB OK",
+      "Checking core thermal limits.......... [NOMINAL]",
+      "Booting SUB_LEVEL_02 local controls... [OK]",
       "",
-      "Award Plug and Play BIOS Extension v1.0A",
-      "Detecting IDE Primary Master  ... Heatcore_SSD [OK]",
-      "Detecting IDE Primary Slave   ... [None]",
-      "Detecting IDE Secondary Master... Solar_Mod.iso [OK]",
-      "Detecting IDE Secondary Slave ... Fornalha_Engine.pak [OK]",
+      "Mounting operator firmware protocols...",
+      " > SOLAR_UNIT_SYS   ... LOADED",
+      " > FORNALHA_UNIT_SYS... LOADED",
       "",
-      "Initializing USB Controllers... [OK]",
-      "Verifying DMI Pool Data....................... SUCCESS",
-      "Allocating DMA channels for Audio Mixer....... [OK]",
-      "Mounting Tiled JSON Maps & Spritesheets....... [OK]",
+      "Establishing Socket.IO uplink......... [CONNECTED]",
+      "Synchronizing neural map matrices..... [OK]",
+      "Calibrating physics engine modules.... [OK]",
       "",
-      "Press DEL to enter SETUP",
-      "20/11/2026-i430VX-UMC8669-2A59GH2BC-00",
+      "Bypassing internal safety limits...... [OVERRIDE ACCEPTED]",
+      "Checking hybrid controller mappings... [XINPUT/SNES DETECTED]",
+      "All systems functional.",
       "",
-      "SYSTEM BOOT SUCCESSFUL. LOADING INTERFACE..."
+      "BOOT SEQUENCE COMPLETE. ENTERING MAIN INTERFACE..."
     ];
 
-    let consoleText = this.add.text(40, 30, "", {
+    let consoleText = this.add.text(40, 40, "", {
       fontFamily: "'Courier New', Courier, monospace", 
-      fontSize: 15,
-      color: "#00ff00", 
+      fontSize: 16,
+      color: "#00f3ff",
       align: "left",
-      shadow: { offsetX: 0, offsetY: 0, color: '#00ff00', blur: 4, fill: true } 
-    });
+      shadow: { offsetX: 0, offsetY: 0, color: '#00f3ff', blur: 6, fill: true } 
+    }).setDepth(15);
 
     this.time.addEvent({
-        delay: 1500,
+        delay: 2000,
         loop: true,
         callback: () => {
-            if (Math.random() > 0.6 && !this.jaFoiProMenu) {
-                consoleText.x = 43; 
-                this.time.delayedCall(50, () => { consoleText.x = 40; }); 
+            if (Math.random() > 0.7 && !this.jaFoiProMenu) {
+                consoleText.x = 42; 
+                this.time.delayedCall(60, () => { consoleText.x = 40; }); 
             }
         }
     });
@@ -157,25 +249,33 @@ export class Boot extends Scene {
     let textoAcumulado = "";
 
     this.time.addEvent({
-      delay: 120, 
+      delay: 110,
       repeat: linhasDoTerminal.length - 1,
       callback: () => {
         if (this.jaFoiProMenu) return; 
 
         textoAcumulado += linhasDoTerminal[linhaAtual] + "\n";
-        consoleText.setText(textoAcumulado + "_");
+        
+        let textoFinal = textoAcumulado;
+        consoleText.setText(textoFinal + "█");
         linhaAtual++;
 
         if (linhaAtual === linhasDoTerminal.length) {
-          this.time.delayedCall(900, () => {
+          this.time.delayedCall(700, () => {
             this.irParaPreloader();
           });
         }
       }
     });
 
-    this.input.once("pointerdown", () => this.irParaPreloader());
-    this.input.keyboard.once("keydown-ENTER", () => this.irParaPreloader());
+    this.time.delayedCall(250, () => {
+        this.input.on("pointerdown", () => {
+            if (this.podePularBios && !this.jaFoiProMenu) this.irParaPreloader();
+        });
+        this.input.keyboard.on("keydown", () => {
+            if (this.podePularBios && !this.jaFoiProMenu) this.irParaPreloader();
+        });
+    });
   }
 
   irParaPreloader() {
@@ -186,7 +286,7 @@ export class Boot extends Scene {
         this.sound.stopByKey('boot_pc');
     } catch (e) {}
 
-    this.cameras.main.fadeOut(800, 0, 0, 0);
+    this.cameras.main.fadeOut(500, 0, 0, 0);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
         this.scene.stop("Boot");
         this.scene.start("Preloader");

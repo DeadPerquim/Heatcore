@@ -1,0 +1,14 @@
+{ "columns":7,
+ "image":"..\/..\/sprites\/environment\/texturas_tileset1.1.png",
+ "imageheight":96,
+ "imagewidth":112,
+ "margin":0,
+ "name":"texturas_tileset1.1",
+ "spacing":0,
+ "tilecount":42,
+ "tiledversion":"1.12.2",
+ "tileheight":16,
+ "tilewidth":16,
+ "type":"tileset",
+ "version":"1.10"
+}
