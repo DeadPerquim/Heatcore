@@ -57,10 +57,14 @@ io.on('connection', (socket) => {
         if (estadoJogo.personagensEscolhidos.solar === socket.id) tipoPersonagem = 'solar';
         if (estadoJogo.personagensEscolhidos.fornalha === socket.id) tipoPersonagem = 'fornalha';
 
-        console.log(`📍 Recebido 'enviarPosicao' do socket ${socket.id} (Identificado como: ${tipoPersonagem})`, data);
-
         if (tipoPersonagem) {
-            estadoJogo.posicoes[tipoPersonagem] = { x: data.x, y: data.y };
+            // Agora salvamos também a cena e se o jogador já passou da tela de controles!
+            estadoJogo.posicoes[tipoPersonagem] = { 
+                x: data.x, 
+                y: data.y,
+                cena: data.cena,
+                pronto: data.pronto
+            };
             io.emit('atualizarPosicoes', estadoJogo.posicoes);
         } else {
             console.log(`⚠️ ATENÇÃO: Socket ${socket.id} tentou enviar posição mas não está associado a nenhum personagem!`);
@@ -72,7 +76,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('faseDiarioConcluida', () => {
-        // Envia o sinal para todas as abas/jogadores voltarem ao menu juntos
         io.emit('voltarAoMenuGeral');
     });
 

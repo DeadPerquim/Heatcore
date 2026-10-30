@@ -409,7 +409,7 @@ export class Mapa2 extends Scene {
 
             // B0 (A), B1 (B) = Pular | B2 (X), B3 (Y), L, R = Correr
             if (isBtnPressed(pad, 2) || (pad && pad.A)) tentouPular = true;
-            if (isBtnPressed(pad, 3) || isBtnPressed(pad, 6) || (pad && pad.R2 && pad.R2 > 0.1)) estaCorrendo = true;
+            if (isBtnPressed(pad, 3) || isBtnPressed(pad, 5) || (pad && pad.R2 && pad.R2 > 0.1)) estaCorrendo = true;
 
             // B8 (Select), B9 (Start) = Sair
             if (isBtnPressed(pad, 8) || isBtnPressed(pad, 9)) {
