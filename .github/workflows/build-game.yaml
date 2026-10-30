@@ -41,6 +41,6 @@ jobs:
           pack build ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }} \
             --builder paketobuildpacks/builder-jammy-base \
             --env "BP_NODE_VERSION=24" \
-            --path . \
+            --path ./dist \
             --publish \
             --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
