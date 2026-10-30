@@ -105,7 +105,6 @@ export class Game extends Scene {
                 const dadosOutro = posicoes[this.outroPersonagemTipo];
                 
                 if (dadosOutro) {
-                    // VERIFICA SE OS DOIS ESTÃO PRONTOS PARA INICIAR SIMULTANEAMENTE
                     if (this.estadoProntidao && !this.jogadoresProntos) {
                         if (dadosOutro.cena === this.scene.key && dadosOutro.pronto) {
                             this.iniciarPartida();
@@ -166,11 +165,8 @@ export class Game extends Scene {
         this.somCorrendo = this.sound.add('sfx_andando', { loop: true, volume: 0.25 * volSFX, rate: rateCorrendo });
         this.somPulando = this.sound.add('sfx_pulando', { volume: 0.4 * volSFX });
 
-        // ==========================================
-        // SISTEMA DE ESPERA E OVERLAY DE CONTROLES
-        // ==========================================
-        this.estadoProntidao = false; // Fica true quando eu fecho a tela de controles
-        this.jogadoresProntos = false; // Fica true quando os DOIS fecharem a tela de controles
+        this.estadoProntidao = false;
+        this.jogadoresProntos = false;
         this.criarOverlayControles();
     }
 
@@ -181,18 +177,15 @@ export class Game extends Scene {
         this.overlayControles = this.add.container(0, 0).setDepth(3000);
         this.overlayControles.setScrollFactor(0);
 
-        // Fundo opaco com estilo terminal/cyber
         const fundo = this.add.rectangle(0, 0, sw, sh, 0x06070b, 0.92).setOrigin(0);
         this.overlayControles.add(fundo);
 
         const graficosFixos = this.add.graphics();
         this.overlayControles.add(graficosFixos);
 
-        // Moldura externa
         graficosFixos.lineStyle(2, 0x00f3ff, 0.2);
         graficosFixos.strokeRect(20, 20, sw - 40, sh - 40);
 
-        // Cantoneiras
         graficosFixos.lineStyle(3, 0xff9900, 0.8);
         const l = 20;
         graficosFixos.moveTo(20, 20 + l); graficosFixos.lineTo(20, 20); graficosFixos.lineTo(20 + l, 20);
@@ -200,21 +193,16 @@ export class Game extends Scene {
         graficosFixos.moveTo(20, sh - 20 - l); graficosFixos.lineTo(20, sh - 20); graficosFixos.lineTo(20 + l, sh - 20);
         graficosFixos.moveTo(sw - 20 - l, sh - 20); graficosFixos.lineTo(sw - 20, sh - 20); graficosFixos.lineTo(sw - 20, sh - 20 - l);
 
-        // Cabeçalho status
         this.overlayControles.add(this.add.text(40, 40, "SYS_STATUS // AWAITING_INPUT...", {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#00f3ff"
         }).setAlpha(0.6));
 
-        // ==========================================
-        // CONTAINER DOS BOTÕES (Este vai sumir primeiro)
-        // ==========================================
         this.containerBotoes = this.add.container(0, 0);
         this.overlayControles.add(this.containerBotoes);
 
         const graficosBotoes = this.add.graphics();
         this.containerBotoes.add(graficosBotoes);
 
-        // Título Central dos Controles
         const txtTitulo = this.add.text(sw / 2, sh * 0.12, ">> REVISÃO DE COMANDOS <<", {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 24, color: "#ff9900",
             align: 'center', stroke: "#000", strokeThickness: 4,
@@ -223,7 +211,6 @@ export class Game extends Scene {
         this.containerBotoes.add(txtTitulo);
         this.tweens.add({ targets: txtTitulo, alpha: { from: 0.7, to: 1 }, duration: 800, yoyo: true, repeat: -1 });
 
-        // Linha divisória
         graficosBotoes.lineStyle(1, 0x00f3ff, 0.3);
         graficosBotoes.lineBetween(sw/2, sh*0.25, sw/2, sh*0.80);
 
@@ -268,13 +255,11 @@ export class Game extends Scene {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 20, color: "#ffffff", fontStyle: "bold" 
         }).setOrigin(0.5));
 
-        // Gamepad wireframe
         graficosBotoes.lineStyle(2, 0x00f3ff, 0.5);
         graficosBotoes.fillStyle(0x001a33, 0.3);
         graficosBotoes.fillRoundedRect(cx - 130, cy - 40, 260, 110, 35);
         graficosBotoes.strokeRoundedRect(cx - 130, cy - 40, 260, 110, 35);
 
-        // D-Pad (Cruzeta)
         graficosBotoes.fillStyle(0x00f3ff, 0.15);
         graficosBotoes.lineStyle(2, 0x00f3ff, 0.8);
         const dX = cx - 70;
@@ -293,7 +278,6 @@ export class Game extends Scene {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
         }).setOrigin(0.5));
 
-        // Botões Coloridos
         const drawBtn = (bx, by, label, isHighlight, desc, descOffY) => {
             const cor = isHighlight ? 0xff9900 : 0x00f3ff;
             graficosBotoes.lineStyle(2, cor, 0.8);
@@ -312,26 +296,22 @@ export class Game extends Scene {
 
         const bX = cx + 70;
         const bY = cy + 15;
-        drawBtn(bX, bY - 28, "Y", false, "CORRER", -22); 
-        drawBtn(bX - 28, bY, "X", false, "", 0); 
-        drawBtn(bX, bY + 28, "A", true, "PULAR", 22);  
-        drawBtn(bX + 28, bY, "B", true, "", 0);  
+        // Padrão SNES: X(Top), Y(Left), B(Bottom), A(Right)
+        drawBtn(bX, bY - 28, "X", false, "", 0); // Topo
+        drawBtn(bX - 28, bY, "Y", true, "CORRER", -22); // Esquerda
+        drawBtn(bX, bY + 28, "B", true, "PULAR", 22);  // Baixo
+        drawBtn(bX + 28, bY, "A", false, "", 0);  // Direita
 
-        // Start/Select
         graficosBotoes.lineStyle(2, 0x00f3ff, 0.5);
         graficosBotoes.strokeRect(cx - 25, cy + 25, 18, 6);
         graficosBotoes.strokeRect(cx + 7, cy + 25, 18, 6);
 
-        // Skip Prompt
         const txtSkip = this.add.text(sw/2, sh - 45, "[ PRESSIONE QUALQUER BOTÃO PARA CONTINUAR ]", {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: "#00ff66"
         }).setOrigin(0.5);
         this.containerBotoes.add(txtSkip);
         this.tweens.add({ targets: txtSkip, alpha: { from: 0.3, to: 1 }, duration: 600, yoyo: true, repeat: -1 });
 
-        // ==========================================
-        // TEXTO DE SINCRONIZAÇÃO (Escondido no início)
-        // ==========================================
         this.txtStatusCentro = this.add.text(sw / 2, sh / 2, "[ ESPERANDO A CONEXÃO DO OUTRO JOGADOR... ]", {
             fontFamily: "'Courier New', Courier, monospace",
             fontSize: 24,
@@ -345,7 +325,6 @@ export class Game extends Scene {
         this.overlayControles.add(this.txtStatusCentro);
         this.tweens.add({ targets: this.txtStatusCentro, alpha: { from: 0.4, to: 1 }, duration: 800, yoyo: true, repeat: -1 });
 
-        // Escuta teclado e mouse para fechar os controles
         this.input.keyboard.on('keydown', () => this.confirmarControles());
         this.input.on('pointerdown', () => this.confirmarControles());
         
@@ -354,19 +333,15 @@ export class Game extends Scene {
 
     confirmarControles() {
         if (!this.estadoProntidao) {
-            this.estadoProntidao = true; // Estou pronto!
+            this.estadoProntidao = true; 
             
             if (this.cache.audio.exists('sfx_clicar_botao')) {
                 this.sound.play('sfx_clicar_botao', { volume: 0.5 });
             }
 
-            // Oculta tudo que ensinava os controles
             this.containerBotoes.setVisible(false);
-            
-            // Mostra a tela de "ESPERANDO..."
             this.txtStatusCentro.setVisible(true);
 
-            // Se for teste offline sem servidor (socket off), inicia imediatamente
             if (!this.socket) {
                 this.iniciarPartida();
             }
@@ -531,7 +506,6 @@ export class Game extends Scene {
         }
 
         if (this.socket) {
-            // Repassando estadoProntidao para o servidor para sincronizar os dois jogadores
             this.socket.emit('enviarPosicao', { 
                 x: activePlayer.x, 
                 y: activePlayer.y,
@@ -602,16 +576,12 @@ export class Game extends Scene {
             }
         }
 
-        // ==========================================
-        // TRAVA OS CONTROLES SE A PARTIDA NÃO COMEÇOU
-        // ==========================================
         if (!this.jogadoresProntos) {
             indoEsquerda = false;
             indoDireita = false;
             tentouPular = false;
             estaCorrendo = false;
 
-            // Fechar overlay de controles via Gamepad
             if (padAtivo && this.podeFecharComGamepad && !this.estadoProntidao) {
                 let apertouGamepad = false;
                 if (pad && pad.buttons) {
