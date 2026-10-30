@@ -11,28 +11,18 @@ export class Game extends Scene {
         
         this.pontosSolar = data ? (data.pontosSolar || 0) : 0;
         this.pontosFornalha = data ? (data.pontosFornalha || 0) : 0;
-
-        console.log(`🛡️ [SEGURANÇA] Esta aba é rigorosamente o: ${this.personagemInicial.toUpperCase()}`);
     }
 
     create() {
-        // Puxa o volume global apenas uma vez no topo do create
         const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
 
-        // =============== SISTEMA DE AMBIENTAÇÃO ===============
         let somAmbiente = this.sound.get('ambientacao');
-        
         if (!somAmbiente) {
             somAmbiente = this.sound.add('ambientacao', { loop: true, volume: 0.8 }); 
         }
-        
-        if (!somAmbiente.isPlaying) {
-            somAmbiente.play();
-        }
-        // ======================================================
+        if (!somAmbiente.isPlaying) somAmbiente.play();
 
         this.cameras.main.fadeIn(600, 0, 0, 0);
-
         this.socket = this.game.socket;
 
         if (this.socket) {
@@ -113,18 +103,28 @@ export class Game extends Scene {
             this.socket.on('atualizarPosicoes', (posicoes) => {
                 if (!posicoes) return;
                 const dadosOutro = posicoes[this.outroPersonagemTipo];
-                if (dadosOutro && this.outroSprite) {
-                    if ((dadosOutro.x === 0 && dadosOutro.y === 0) || (dadosOutro.cena && dadosOutro.cena !== this.scene.key)) {
-                        this.outroSprite.setVisible(false);
-                    } else {
-                        this.outroSprite.x = dadosOutro.x;
-                        this.outroSprite.y = dadosOutro.y;
-                        this.outroSprite.setVisible(true);
+                
+                if (dadosOutro) {
+                    // VERIFICA SE OS DOIS ESTÃO PRONTOS PARA INICIAR SIMULTANEAMENTE
+                    if (this.estadoProntidao && !this.jogadoresProntos) {
+                        if (dadosOutro.cena === this.scene.key && dadosOutro.pronto) {
+                            this.iniciarPartida();
+                        }
+                    }
 
-                        if (this.timeoutOutroJogador) clearTimeout(this.timeoutOutroJogador);
-                        this.timeoutOutroJogador = setTimeout(() => {
-                            if (this.outroSprite) this.outroSprite.setVisible(false);
-                        }, 2500);
+                    if (this.outroSprite) {
+                        if ((dadosOutro.x === 0 && dadosOutro.y === 0) || (dadosOutro.cena && dadosOutro.cena !== this.scene.key)) {
+                            this.outroSprite.setVisible(false);
+                        } else {
+                            this.outroSprite.x = dadosOutro.x;
+                            this.outroSprite.y = dadosOutro.y;
+                            this.outroSprite.setVisible(true);
+
+                            if (this.timeoutOutroJogador) clearTimeout(this.timeoutOutroJogador);
+                            this.timeoutOutroJogador = setTimeout(() => {
+                                if (this.outroSprite) this.outroSprite.setVisible(false);
+                            }, 2500);
+                        }
                     }
                 }
             });
@@ -161,10 +161,236 @@ export class Game extends Scene {
         this.uiContainer.setScrollFactor(0);
         this.adicionarFiltroVisao();
 
-        // Configuração dos áudios de movimento com volume do menu de opções
         this.somAndando = this.sound.add('sfx_andando', { loop: true, volume: 0.25 * volSFX });
-        this.somCorrendo = this.sound.add(this.personagemInicial === 'solar' ? 'sfx_correndo_solar' : 'sfx_correndo_fornalha', { loop: true, volume: 0.25 * volSFX });
+        const rateCorrendo = this.personagemInicial === 'solar' ? 1.8 : 1.4;
+        this.somCorrendo = this.sound.add('sfx_andando', { loop: true, volume: 0.25 * volSFX, rate: rateCorrendo });
         this.somPulando = this.sound.add('sfx_pulando', { volume: 0.4 * volSFX });
+
+        // ==========================================
+        // SISTEMA DE ESPERA E OVERLAY DE CONTROLES
+        // ==========================================
+        this.estadoProntidao = false; // Fica true quando eu fecho a tela de controles
+        this.jogadoresProntos = false; // Fica true quando os DOIS fecharem a tela de controles
+        this.criarOverlayControles();
+    }
+
+    criarOverlayControles() {
+        const sw = this.scale.width;
+        const sh = this.scale.height;
+
+        this.overlayControles = this.add.container(0, 0).setDepth(3000);
+        this.overlayControles.setScrollFactor(0);
+
+        // Fundo opaco com estilo terminal/cyber
+        const fundo = this.add.rectangle(0, 0, sw, sh, 0x06070b, 0.92).setOrigin(0);
+        this.overlayControles.add(fundo);
+
+        const graficosFixos = this.add.graphics();
+        this.overlayControles.add(graficosFixos);
+
+        // Moldura externa
+        graficosFixos.lineStyle(2, 0x00f3ff, 0.2);
+        graficosFixos.strokeRect(20, 20, sw - 40, sh - 40);
+
+        // Cantoneiras
+        graficosFixos.lineStyle(3, 0xff9900, 0.8);
+        const l = 20;
+        graficosFixos.moveTo(20, 20 + l); graficosFixos.lineTo(20, 20); graficosFixos.lineTo(20 + l, 20);
+        graficosFixos.moveTo(sw - 20 - l, 20); graficosFixos.lineTo(sw - 20, 20); graficosFixos.lineTo(sw - 20, 20 + l);
+        graficosFixos.moveTo(20, sh - 20 - l); graficosFixos.lineTo(20, sh - 20); graficosFixos.lineTo(20 + l, sh - 20);
+        graficosFixos.moveTo(sw - 20 - l, sh - 20); graficosFixos.lineTo(sw - 20, sh - 20); graficosFixos.lineTo(sw - 20, sh - 20 - l);
+
+        // Cabeçalho status
+        this.overlayControles.add(this.add.text(40, 40, "SYS_STATUS // AWAITING_INPUT...", {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#00f3ff"
+        }).setAlpha(0.6));
+
+        // ==========================================
+        // CONTAINER DOS BOTÕES (Este vai sumir primeiro)
+        // ==========================================
+        this.containerBotoes = this.add.container(0, 0);
+        this.overlayControles.add(this.containerBotoes);
+
+        const graficosBotoes = this.add.graphics();
+        this.containerBotoes.add(graficosBotoes);
+
+        // Título Central dos Controles
+        const txtTitulo = this.add.text(sw / 2, sh * 0.12, ">> REVISÃO DE COMANDOS <<", {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 24, color: "#ff9900",
+            align: 'center', stroke: "#000", strokeThickness: 4,
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff9900', blur: 8, fill: true }
+        }).setOrigin(0.5);
+        this.containerBotoes.add(txtTitulo);
+        this.tweens.add({ targets: txtTitulo, alpha: { from: 0.7, to: 1 }, duration: 800, yoyo: true, repeat: -1 });
+
+        // Linha divisória
+        graficosBotoes.lineStyle(1, 0x00f3ff, 0.3);
+        graficosBotoes.lineBetween(sw/2, sh*0.25, sw/2, sh*0.80);
+
+        // DESENHO DO TECLADO
+        const kx = sw * 0.25;
+        const ky = sh * 0.50;
+
+        this.containerBotoes.add(this.add.text(kx, ky - 110, "[ INPUT: TECLADO ]", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 20, color: "#ffffff", fontStyle: "bold" 
+        }).setOrigin(0.5));
+
+        const drawKey = (x, y, w, h, label, desc, isHighlight) => {
+            const cor = isHighlight ? 0xff9900 : 0x00f3ff;
+            const bgCor = isHighlight ? 0x331a00 : 0x001a33;
+            graficosBotoes.fillStyle(bgCor, 0.6);
+            graficosBotoes.fillRect(x, y, w, h);
+            graficosBotoes.lineStyle(2, cor, 0.8);
+            graficosBotoes.strokeRect(x, y, w, h);
+            
+            this.containerBotoes.add(this.add.text(x + w/2, y + h/2, label, { 
+                fontFamily: "'Courier New', Courier, monospace", fontSize: 18, color: isHighlight ? "#ff9900" : "#00f3ff", fontStyle: "bold" 
+            }).setOrigin(0.5));
+            if (desc) {
+                this.containerBotoes.add(this.add.text(x + w/2, y + h + 15, desc, { 
+                    fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
+                }).setOrigin(0.5));
+            }
+        };
+
+        drawKey(kx - 25, ky - 40, 50, 50, "W", "PULAR", true);
+        drawKey(kx - 80, ky + 20, 50, 50, "A", "ESQ.", false);
+        drawKey(kx - 25, ky + 20, 50, 50, "S", "", false);
+        drawKey(kx + 30, ky + 20, 50, 50, "D", "DIR.", false);
+        drawKey(kx - 160, ky + 20, 70, 50, "SHIFT", "CORRER", false);
+        drawKey(kx - 80, ky + 100, 160, 40, "ESPAÇO", "PULAR", true);
+
+        // DESENHO DO GAMEPAD
+        const cx = sw * 0.75;
+        const cy = sh * 0.50;
+
+        this.containerBotoes.add(this.add.text(cx, cy - 110, "[ INPUT: GAMEPAD ]", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 20, color: "#ffffff", fontStyle: "bold" 
+        }).setOrigin(0.5));
+
+        // Gamepad wireframe
+        graficosBotoes.lineStyle(2, 0x00f3ff, 0.5);
+        graficosBotoes.fillStyle(0x001a33, 0.3);
+        graficosBotoes.fillRoundedRect(cx - 130, cy - 40, 260, 110, 35);
+        graficosBotoes.strokeRoundedRect(cx - 130, cy - 40, 260, 110, 35);
+
+        // D-Pad (Cruzeta)
+        graficosBotoes.fillStyle(0x00f3ff, 0.15);
+        graficosBotoes.lineStyle(2, 0x00f3ff, 0.8);
+        const dX = cx - 70;
+        const dY = cy + 15;
+        
+        graficosBotoes.beginPath();
+        graficosBotoes.moveTo(dX - 8, dY - 25); graficosBotoes.lineTo(dX + 8, dY - 25);
+        graficosBotoes.lineTo(dX + 8, dY - 8); graficosBotoes.lineTo(dX + 25, dY - 8);
+        graficosBotoes.lineTo(dX + 25, dY + 8); graficosBotoes.lineTo(dX + 8, dY + 8);
+        graficosBotoes.lineTo(dX + 8, dY + 25); graficosBotoes.lineTo(dX - 8, dY + 25);
+        graficosBotoes.lineTo(dX - 8, dY + 8); graficosBotoes.lineTo(dX - 25, dY + 8);
+        graficosBotoes.lineTo(dX - 25, dY - 8); graficosBotoes.lineTo(dX - 8, dY - 8);
+        graficosBotoes.closePath(); graficosBotoes.fillPath(); graficosBotoes.strokePath();
+
+        this.containerBotoes.add(this.add.text(dX, dY + 45, "MOVER", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
+        }).setOrigin(0.5));
+
+        // Botões Coloridos
+        const drawBtn = (bx, by, label, isHighlight, desc, descOffY) => {
+            const cor = isHighlight ? 0xff9900 : 0x00f3ff;
+            graficosBotoes.lineStyle(2, cor, 0.8);
+            graficosBotoes.fillStyle(isHighlight ? 0x331a00 : 0x001a33, 0.8);
+            graficosBotoes.fillCircle(bx, by, 14);
+            graficosBotoes.strokeCircle(bx, by, 14);
+            this.containerBotoes.add(this.add.text(bx, by, label, { 
+                fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: isHighlight ? "#ff9900" : "#00f3ff", fontStyle: "bold" 
+            }).setOrigin(0.5));
+            if (desc) {
+                this.containerBotoes.add(this.add.text(bx, by + descOffY, desc, { 
+                    fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
+                }).setOrigin(0.5));
+            }
+        };
+
+        const bX = cx + 70;
+        const bY = cy + 15;
+        drawBtn(bX, bY - 28, "Y", false, "CORRER", -22); 
+        drawBtn(bX - 28, bY, "X", false, "", 0); 
+        drawBtn(bX, bY + 28, "A", true, "PULAR", 22);  
+        drawBtn(bX + 28, bY, "B", true, "", 0);  
+
+        // Start/Select
+        graficosBotoes.lineStyle(2, 0x00f3ff, 0.5);
+        graficosBotoes.strokeRect(cx - 25, cy + 25, 18, 6);
+        graficosBotoes.strokeRect(cx + 7, cy + 25, 18, 6);
+
+        // Skip Prompt
+        const txtSkip = this.add.text(sw/2, sh - 45, "[ PRESSIONE QUALQUER BOTÃO PARA CONTINUAR ]", {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: "#00ff66"
+        }).setOrigin(0.5);
+        this.containerBotoes.add(txtSkip);
+        this.tweens.add({ targets: txtSkip, alpha: { from: 0.3, to: 1 }, duration: 600, yoyo: true, repeat: -1 });
+
+        // ==========================================
+        // TEXTO DE SINCRONIZAÇÃO (Escondido no início)
+        // ==========================================
+        this.txtStatusCentro = this.add.text(sw / 2, sh / 2, "[ ESPERANDO A CONEXÃO DO OUTRO JOGADOR... ]", {
+            fontFamily: "'Courier New', Courier, monospace",
+            fontSize: 24,
+            color: "#ff9900",
+            align: 'center',
+            stroke: "#000",
+            strokeThickness: 4,
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff9900', blur: 8, fill: true }
+        }).setOrigin(0.5).setVisible(false);
+        
+        this.overlayControles.add(this.txtStatusCentro);
+        this.tweens.add({ targets: this.txtStatusCentro, alpha: { from: 0.4, to: 1 }, duration: 800, yoyo: true, repeat: -1 });
+
+        // Escuta teclado e mouse para fechar os controles
+        this.input.keyboard.on('keydown', () => this.confirmarControles());
+        this.input.on('pointerdown', () => this.confirmarControles());
+        
+        this.podeFecharComGamepad = true; 
+    }
+
+    confirmarControles() {
+        if (!this.estadoProntidao) {
+            this.estadoProntidao = true; // Estou pronto!
+            
+            if (this.cache.audio.exists('sfx_clicar_botao')) {
+                this.sound.play('sfx_clicar_botao', { volume: 0.5 });
+            }
+
+            // Oculta tudo que ensinava os controles
+            this.containerBotoes.setVisible(false);
+            
+            // Mostra a tela de "ESPERANDO..."
+            this.txtStatusCentro.setVisible(true);
+
+            // Se for teste offline sem servidor (socket off), inicia imediatamente
+            if (!this.socket) {
+                this.iniciarPartida();
+            }
+        }
+    }
+
+    iniciarPartida() {
+        if (this.jogadoresProntos) return;
+        this.jogadoresProntos = true;
+        
+        this.txtStatusCentro.setText("[ CONEXÃO ESTABELECIDA ]\n>> INICIANDO SIMULAÇÃO <<");
+        this.txtStatusCentro.setColor("#00ff66");
+        this.txtStatusCentro.setShadow(0, 0, '#00ff66', 8, true);
+        
+        this.time.delayedCall(800, () => {
+            this.tweens.add({
+                targets: this.overlayControles,
+                alpha: 0,
+                duration: 300,
+                onComplete: () => {
+                    this.overlayControles.setVisible(false);
+                }
+            });
+        });
     }
 
     pararSonsMovimento() {
@@ -179,8 +405,7 @@ export class Game extends Scene {
     }
 
     configurarAnimacoes() {
-        const char = this.personagemInicial; // 'solar' ou 'fornalha'
-        
+        const char = this.personagemInicial;
         if (!this.anims.exists(`${char}_walk`)) {
             this.anims.create({ key: `${char}_walk`, frames: this.anims.generateFrameNumbers(`${char}_andando`, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
         }
@@ -297,9 +522,7 @@ export class Game extends Scene {
     update() {
         if (this.jaEstaSaindo) return;
         
-        // Puxa o volume global apenas uma vez no topo do update
         const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
-
         const activePlayer = this.jogadorAtual;
         if (!activePlayer || !activePlayer.body) return;
 
@@ -308,10 +531,12 @@ export class Game extends Scene {
         }
 
         if (this.socket) {
+            // Repassando estadoProntidao para o servidor para sincronizar os dois jogadores
             this.socket.emit('enviarPosicao', { 
                 x: activePlayer.x, 
                 y: activePlayer.y,
-                cena: this.scene.key
+                cena: this.scene.key,
+                pronto: this.estadoProntidao
             });
         }
 
@@ -321,11 +546,7 @@ export class Game extends Scene {
         this.apertouD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
         this.apertouShift = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
 
-        // ==========================================
-        // MAPEAMENTO HÍBRIDO NATIVO (Xbox + PlayStation + SNES)
-        // ==========================================
         const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
-        
         const isBtnPressed = (padObj, index) => {
             if (padObj && padObj.buttons && padObj.buttons[index]) {
                 if (padObj.buttons[index].pressed || padObj.buttons[index].value > 0.5) return true;
@@ -366,21 +587,53 @@ export class Game extends Scene {
 
         if (padAtivo) {
             const axisX = (pad && pad.leftStick ? pad.leftStick.x : 0) || getAxisValue(pad, 0);
-            
             if (axisX < -0.2 || (pad && pad.left) || isBtnPressed(pad, 14)) indoEsquerda = true;
             if (axisX > 0.2 || (pad && pad.right) || isBtnPressed(pad, 15)) indoDireita = true;
 
-            // B0 (A), B1 (B) = Pular | B2 (X), B3 (Y), L, R = Correr
             if (isBtnPressed(pad, 2) || (pad && pad.A)) tentouPular = true;
             if (isBtnPressed(pad, 3) || isBtnPressed(pad, 5) || (pad && pad.R2 && pad.R2 > 0.1)) estaCorrendo = true;
 
-            // B8 (Select), B9 (Start) = Sair
             if (isBtnPressed(pad, 8) || isBtnPressed(pad, 9)) {
                 if (this.scene.isActive('Game')) { 
                     this.scene.stop('Game');
                     this.scene.start('MainMenu');
                 }
                 return;
+            }
+        }
+
+        // ==========================================
+        // TRAVA OS CONTROLES SE A PARTIDA NÃO COMEÇOU
+        // ==========================================
+        if (!this.jogadoresProntos) {
+            indoEsquerda = false;
+            indoDireita = false;
+            tentouPular = false;
+            estaCorrendo = false;
+
+            // Fechar overlay de controles via Gamepad
+            if (padAtivo && this.podeFecharComGamepad && !this.estadoProntidao) {
+                let apertouGamepad = false;
+                if (pad && pad.buttons) {
+                    for (let i = 0; i < pad.buttons.length; i++) {
+                        if (isBtnPressed(pad, i)) apertouGamepad = true;
+                    }
+                }
+                if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+                    const rawPads = navigator.getGamepads();
+                    for (let p = 0; p < rawPads.length; p++) {
+                        if (rawPads[p] && rawPads[p].buttons) {
+                            for (let b = 0; b < rawPads[p].buttons.length; b++) {
+                                if (rawPads[p].buttons[b].pressed || rawPads[p].buttons[b].value > 0.5) apertouGamepad = true;
+                            }
+                        }
+                    }
+                }
+
+                if (apertouGamepad) {
+                    this.confirmarControles();
+                    this.podeFecharComGamepad = false;
+                }
             }
         }
 
@@ -392,23 +645,18 @@ export class Game extends Scene {
         const velocidadeMax = estaCorrendo ? 260 : 160; 
         const impulsoParedeX = estaCorrendo ? 320 : 220; 
 
-        // 1. PULO NORMAL E DESLIZE
         if (tentouPular && noChao) {
             activePlayer.setVelocityY(-400); 
             if (this.somPulando) this.somPulando.play({ volume: 0.4 * volSFX });
         }
         if (estaNaParede) activePlayer.setVelocityY(50); 
 
-        // 2. PULO NA PAREDE CORRIGIDO
         if (tentouPular && estaNaParede) {
-            // Verifica a FÍSICA da parede tocada (body.blocked), ignorando o botão apertado
             if (body.blocked.left) {
-                // Parede está à esquerda -> Lança para a DIREITA
                 activePlayer.setVelocityX(impulsoParedeX); 
                 activePlayer.setVelocityY(-380);
                 activePlayer.setFlipX(false);
             } else if (body.blocked.right) {
-                // Parede está à direita -> Lança para a ESQUERDA
                 activePlayer.setVelocityX(-impulsoParedeX); 
                 activePlayer.setVelocityY(-380);
                 activePlayer.setFlipX(true);
@@ -416,12 +664,9 @@ export class Game extends Scene {
             if (this.somPulando) this.somPulando.play({ volume: 0.4 * volSFX });
         }
 
-        // 3. SISTEMA DE ACELERAÇÃO (MOMENTUM ESTILO SUPER MARIO WORLD)
         let vx = activePlayer.body.velocity.x;
-        
-        // Ajuste estes valores para deixar o personagem mais "pesado" ou "escorregadio"
-        const aceleracao = noChao ? 18 : 10; // Acelera mais rápido no chão, tem mais inércia no ar
-        const atrito = noChao ? 25 : 5;      // Atrito forte no chão, no ar demora para virar (air control)
+        const aceleracao = noChao ? 18 : 10; 
+        const atrito = noChao ? 25 : 5;      
 
         if (indoEsquerda) {
             vx -= aceleracao;
@@ -432,7 +677,6 @@ export class Game extends Scene {
             if (vx > velocidadeMax) vx = velocidadeMax;
             activePlayer.setFlipX(false);
         } else {
-            // Atrito aplicado quando o jogador solta o analógico/teclado (Mario derrapando até parar)
             if (vx > 0) {
                 vx -= atrito;
                 if (vx < 0) vx = 0;
@@ -446,7 +690,6 @@ export class Game extends Scene {
 
         const char = this.personagemInicial; 
 
-        // Função rápida para calar os passos se estiver no ar ou parado
         const silenciarPassos = () => {
             if (this.somAndando && this.somAndando.isPlaying) this.somAndando.stop();
             if (this.somCorrendo && this.somCorrendo.isPlaying) this.somCorrendo.stop();
