@@ -117,7 +117,7 @@ function getLocalIP() {
 }
 
 const PORT = 3000;
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '::', () => {
     const ip = getLocalIP();
     console.log(`\n==================================================`);
     console.log(`🔥 HEATCORE SERVER ONLINE NA FEIRA! 🔥`);
