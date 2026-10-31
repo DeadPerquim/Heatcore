@@ -86,6 +86,7 @@ export class Preloader extends Scene {
 
   preload() {
     this.load.tilemapTiledJSON('mapa', 'assets/maps/_mapasdojogo/Mapa1.json');
+    this.load.tilemapTiledJSON('mapa1', 'assets/maps/_mapasdojogo/Mapa4.json');
     this.load.tilemapTiledJSON('mapa2', 'assets/maps/_mapasdojogo/Mapa2.json');
     this.load.tilemapTiledJSON('mapa3', 'assets/maps/_mapasdojogo/Mapa3.json');
 
@@ -116,6 +117,7 @@ export class Preloader extends Scene {
 
     this.load.audio('sfx_andando', 'assets/audio/sfx/walking/Andando.mp3');
     this.load.audio('sfx_pulando', 'assets/audio/sfx/jump/Pulando.mp3');
+    this.load.audio('sfx_bater', 'assets/audio/sfx/punch/Bater.mp3');
     this.load.audio('sfx_correndo_solar', 'assets/audio/sfx/walking/CorrendoSolar.mp3');
     this.load.audio('sfx_correndo_fornalha', 'assets/audio/sfx/walking/CorrendoFornalha.mp3');
 
@@ -129,6 +131,10 @@ export class Preloader extends Scene {
     this.load.audio('sfx_clicar_botao', 'assets/audio/sfx/menu/ClicarBotão.mp3');
     this.load.audio('sfx_vitoria', 'assets/audio/sfx/menu/Vitoria.mp3');
     this.load.audio('sfx_aplausos', 'assets/audio/sfx/menu/Aplausos.mp3');
+
+    this.load.image('preview_mapa1', 'assets/maps/_mapasdojogo/Imagens/preview_mapa1.png');
+    this.load.image('preview_mapa2', 'assets/maps/_mapasdojogo/Imagens/preview_mapa2.png');
+    this.load.image('preview_mapa3', 'assets/maps/_mapasdojogo/Imagens/preview_mapa3.png');
   }
 
   create() {

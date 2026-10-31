@@ -1,5 +1,6 @@
 import { Boot } from "./scenes/Boot";
 import { Game as MainGame } from "./scenes/Game";
+import { Mapa1 } from "./scenes/Mapa1";
 import { Mapa2 } from "./scenes/Mapa2";
 import { Mapa3 } from "./scenes/Mapa3";
 import { GameOver } from "./scenes/GameOver";
@@ -9,6 +10,9 @@ import { AUTO, Game } from "phaser";
 import { Diario } from "./scenes/Diario.js";
 import { PlacarTransicao } from './scenes/PlacarTransicao.js';
 import { Creditos } from './scenes/Creditos';
+import { Salas } from './scenes/Salas';
+import { Placar } from './scenes/Placar';
+
 
 const config = {
   type: AUTO,
@@ -18,6 +22,7 @@ const config = {
   input: {
       gamepad: true
   },
+  dom: { createContainer: true },
   parent: "game-container",
   backgroundColor: "#000000",
   physics: {
@@ -31,7 +36,7 @@ const config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [Boot, Preloader, MainMenu, MainGame, GameOver, Mapa2, Mapa3, Diario, PlacarTransicao, Creditos],
+  scene: [Boot, Preloader, MainMenu, MainGame, GameOver, Mapa1, Mapa2, Mapa3, Diario, PlacarTransicao, Creditos, Salas, Placar],
 };
 
 const StartGame = (parent) => {

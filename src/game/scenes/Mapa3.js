@@ -8,31 +8,20 @@ export class Mapa3 extends Scene {
     init(data) {
         this.personagemInicial = (data && data.personagem) ? data.personagem : (this.game.meuPersonagem || 'solar');
         this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
-        
         this.pontosSolar = data ? (data.pontosSolar || 0) : 0;
         this.pontosFornalha = data ? (data.pontosFornalha || 0) : 0;
-
+        this.mostrarTutorialInicial = data ? (data.mostrarTutorial || false) : false;
         console.log(`🛡️ [MAPA3] Esta aba é rigorosamente o: ${this.personagemInicial.toUpperCase()}`);
     }
 
     create() {
-        // Puxa o volume global apenas uma vez no topo do create
         const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
 
-        // =============== SISTEMA DE AMBIENTAÇÃO ===============
         let somAmbiente = this.sound.get('ambientacao');
-        
-        if (!somAmbiente) {
-            somAmbiente = this.sound.add('ambientacao', { loop: true, volume: 0.8 }); 
-        }
-        
-        if (!somAmbiente.isPlaying) {
-            somAmbiente.play();
-        }
-        // ======================================================
+        if (!somAmbiente) somAmbiente = this.sound.add('ambientacao', { loop: true, volume: 0.8 }); 
+        if (!somAmbiente.isPlaying) somAmbiente.play();
 
         this.cameras.main.fadeIn(600, 0, 0, 0);
-
         this.socket = this.game.socket;
 
         if (this.socket) {
@@ -69,16 +58,13 @@ export class Mapa3 extends Scene {
         }
 
         this.mapaAlturaTotal = map.heightInPixels;
-
         if (layerLimites) layerLimites.setCollisionByExclusion([-1]);
         if (layerObjetos) layerObjetos.setCollisionByExclusion([-1]);
         
         this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.physics.world.setBoundsCollision(true, true, true, false);
 
-        const largura = 2500; 
-        const altura = 2500;
-        const raioLuz = 24;   
+        const largura = 2500, altura = 2500, raioLuz = 24;   
 
         if (!this.textures.exists('escuridaoComFuro')) {
             const canvasTexture = this.textures.createCanvas('escuridaoComFuro', largura, altura);
@@ -95,10 +81,7 @@ export class Mapa3 extends Scene {
         this.escuroAtivo = false;
         this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro').setDepth(150).setVisible(false);
 
-        const posicoesSpawn = {
-            solar: { x: 247.5, y: 1100 },
-            fornalha: { x: 1050, y: 1100 }
-        };
+        const posicoesSpawn = { solar: { x: 247.5, y: 1100 }, fornalha: { x: 1050, y: 1100 } };
 
         const coordLocal = posicoesSpawn[this.personagemInicial];
         const chaveLocal = this.personagemInicial === 'solar' ? 'solar_andando' : 'fornalha_andando';
@@ -108,6 +91,7 @@ export class Mapa3 extends Scene {
         this.jogadorAtual.spawnX = this.jogadorAtual.x;
         this.jogadorAtual.spawnY = this.jogadorAtual.y;
         this.jogadorAtual.estaRenascendo = false;
+        this.jogadorAtual.stunned = false;
 
         const coordOutro = posicoesSpawn[this.outroPersonagemTipo];
         const chaveSpriteOutro = this.outroPersonagemTipo === 'solar' ? 'solar_andando' : 'fornalha_andando';
@@ -127,6 +111,20 @@ export class Mapa3 extends Scene {
                         this.outroSprite.x = dadosOutro.x;
                         this.outroSprite.y = dadosOutro.y;
                         this.outroSprite.setVisible(true);
+
+                        // ====== LÓGICA DE RECEBER CHUTE ======
+                        if (dadosOutro.pronto === 'chutou' && !this.levouChute && this.jogadorAtual && !this.jogadorAtual.estaRenascendo) {
+                            const dist = Phaser.Math.Distance.Between(this.jogadorAtual.x, this.jogadorAtual.y, this.outroSprite.x, this.outroSprite.y);
+                            if (dist < 70 && Math.abs(this.jogadorAtual.y - this.outroSprite.y) < 50) {
+                                this.levouChute = true;
+                                this.jogadorAtual.stunned = true;
+                                const direcao = this.jogadorAtual.x < this.outroSprite.x ? -1 : 1;
+                                this.jogadorAtual.setVelocity(direcao * 350, -250);
+                                
+                                setTimeout(() => { if (this.jogadorAtual) this.jogadorAtual.stunned = false; }, 300);
+                                setTimeout(() => { this.levouChute = false; }, 800);
+                            }
+                        }
 
                         if (this.timeoutOutroJogador) clearTimeout(this.timeoutOutroJogador);
                         this.timeoutOutroJogador = setTimeout(() => {
@@ -155,10 +153,13 @@ export class Mapa3 extends Scene {
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.jaEstaSaindo = false;
+        this.isKicking = false;
+        this.levouChute = false;
+        this.ultimoEstadoBater = false;
 
         this.input.keyboard.on('keydown', (event) => {
             if (this.jaEstaSaindo) return;
-            if (event.key === 'e' || event.key === 'E') {
+            if (event.key === 'q' || event.key === 'Q') {
                 this.escuroAtivo = !this.escuroAtivo;
                 if (this.escuridaoSprite) this.escuridaoSprite.setVisible(this.escuroAtivo);
             }
@@ -168,41 +169,242 @@ export class Mapa3 extends Scene {
         this.uiContainer.setScrollFactor(0);
         this.adicionarFiltroVisao();
 
-        // Configuração dos áudios de movimento com volume do menu de opções
         this.somAndando = this.sound.add('sfx_andando', { loop: true, volume: 0.25 * volSFX });
         this.somCorrendo = this.sound.add(this.personagemInicial === 'solar' ? 'sfx_correndo_solar' : 'sfx_correndo_fornalha', { loop: true, volume: 0.25 * volSFX });
         this.somPulando = this.sound.add('sfx_pulando', { volume: 0.4 * volSFX });
+
+        if (this.mostrarTutorialInicial) {
+            this.jogadoresProntos = false; // Bloqueia o player até ele fechar a tela
+            this.criarOverlayControles();
+        } else {
+            this.jogadoresProntos = true; // Libera o player imediatamente se não houver overlay
+        }
+    }
+
+criarOverlayControles() {
+        const sw = this.scale.width;
+        const sh = this.scale.height;
+
+        this.jogadoresProntos = false; 
+
+        this.overlayControles = this.add.container(0, 0).setDepth(3000);
+        this.overlayControles.setScrollFactor(0);
+
+        const fundo = this.add.rectangle(0, 0, sw, sh, 0x06070b, 0.92).setOrigin(0);
+        this.overlayControles.add(fundo);
+
+        const graficosFixos = this.add.graphics();
+        this.overlayControles.add(graficosFixos);
+
+        graficosFixos.lineStyle(2, 0x00f3ff, 0.2);
+        graficosFixos.strokeRect(20, 20, sw - 40, sh - 40);
+
+        graficosFixos.lineStyle(3, 0xff9900, 0.8);
+        const l = 20;
+        graficosFixos.moveTo(20, 20 + l); graficosFixos.lineTo(20, 20); graficosFixos.lineTo(20 + l, 20);
+        graficosFixos.moveTo(sw - 20 - l, 20); graficosFixos.lineTo(sw - 20, 20); graficosFixos.lineTo(sw - 20, 20 + l);
+        graficosFixos.moveTo(20, sh - 20 - l); graficosFixos.lineTo(20, sh - 20); graficosFixos.lineTo(20 + l, sh - 20);
+        graficosFixos.moveTo(sw - 20 - l, sh - 20); graficosFixos.lineTo(sw - 20, sh - 20); graficosFixos.lineTo(sw - 20, sh - 20 - l);
+
+        this.overlayControles.add(this.add.text(40, 40, "SYS_STATUS // ESPERANDO INPUT...", {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#00f3ff"
+        }).setAlpha(0.6));
+
+        this.containerBotoes = this.add.container(0, 0);
+        this.overlayControles.add(this.containerBotoes);
+
+        const graficosBotoes = this.add.graphics();
+        this.containerBotoes.add(graficosBotoes);
+
+        const txtTitulo = this.add.text(sw / 2, sh * 0.12, ">> REVISÃO DE COMANDOS <<", {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 24, color: "#ff9900",
+            align: 'center', stroke: "#000", strokeThickness: 4,
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff9900', blur: 8, fill: true }
+        }).setOrigin(0.5);
+        this.containerBotoes.add(txtTitulo);
+        this.tweens.add({ targets: txtTitulo, alpha: { from: 0.7, to: 1 }, duration: 800, yoyo: true, repeat: -1 });
+
+        graficosBotoes.lineStyle(1, 0x00f3ff, 0.3);
+        graficosBotoes.lineBetween(sw/2, sh*0.25, sw/2, sh*0.80);
+
+        // ===================================
+        // DESENHO DO TECLADO
+        // ===================================
+        const kx = sw * 0.25;
+        const ky = sh * 0.50;
+
+        this.containerBotoes.add(this.add.text(kx, ky - 110, "[ INPUT: TECLADO ]", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 20, color: "#ffffff", fontStyle: "bold" 
+        }).setOrigin(0.5));
+
+        const drawKey = (x, y, w, h, label, desc, isHighlight) => {
+            const cor = isHighlight ? 0xff9900 : 0x00f3ff;
+            const bgCor = isHighlight ? 0x331a00 : 0x001a33;
+            graficosBotoes.fillStyle(bgCor, 0.6);
+            graficosBotoes.fillRect(x, y, w, h);
+            graficosBotoes.lineStyle(2, cor, 0.8);
+            graficosBotoes.strokeRect(x, y, w, h);
+            
+            this.containerBotoes.add(this.add.text(x + w/2, y + h/2, label, { 
+                fontFamily: "'Courier New', Courier, monospace", fontSize: 18, color: isHighlight ? "#ff9900" : "#00f3ff", fontStyle: "bold" 
+            }).setOrigin(0.5));
+            if (desc) {
+                this.containerBotoes.add(this.add.text(x + w/2, y + h + 15, desc, { 
+                    fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
+                }).setOrigin(0.5));
+            }
+        };
+
+        drawKey(kx - 25, ky - 40, 50, 50, "W", "PULAR", true);
+        drawKey(kx - 80, ky + 20, 50, 50, "A", "ESQ.", false);
+        drawKey(kx - 25, ky + 20, 50, 50, "S", "", false);
+        drawKey(kx + 30, ky + 20, 50, 50, "D", "DIR.", false);
+        drawKey(kx - 160, ky + 20, 70, 50, "SHIFT", "CORRER", false);
+        drawKey(kx - 80, ky + 100, 160, 40, "ESPAÇO", "PULAR", true);
+        
+        drawKey(kx + 30, ky - 40, 50, 50, "E", "BATER", true); 
+        drawKey(kx - 160, ky + 100, 70, 40, "CTRL", "BATER", true); 
+
+        // ===================================
+        // DESENHO DO GAMEPAD
+        // ===================================
+        const cx = sw * 0.75;
+        const cy = sh * 0.50;
+
+        this.containerBotoes.add(this.add.text(cx, cy - 110, "[ INPUT: GAMEPAD ]", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 20, color: "#ffffff", fontStyle: "bold" 
+        }).setOrigin(0.5));
+
+        // Botões L e R (Movidos mais para cima para não esmagar o botão X)
+        const bumperY = cy - 80;
+
+        graficosBotoes.lineStyle(2, 0x00f3ff, 0.8);
+        graficosBotoes.fillStyle(0x001a33, 0.8);
+        graficosBotoes.fillRoundedRect(cx - 100, bumperY, 50, 18, 5); // L
+        graficosBotoes.strokeRoundedRect(cx - 100, bumperY, 50, 18, 5);
+        this.containerBotoes.add(this.add.text(cx - 75, bumperY + 9, "L", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: "#00f3ff", fontStyle: "bold" 
+        }).setOrigin(0.5));
+
+        graficosBotoes.lineStyle(2, 0xff9900, 0.8);
+        graficosBotoes.fillStyle(0x331a00, 0.8);
+        graficosBotoes.fillRoundedRect(cx + 50, bumperY, 50, 18, 5); // R
+        graficosBotoes.strokeRoundedRect(cx + 50, bumperY, 50, 18, 5);
+        this.containerBotoes.add(this.add.text(cx + 75, bumperY + 9, "R", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: "#ff9900", fontStyle: "bold" 
+        }).setOrigin(0.5));
+        
+        // TEXTO "CORRER" perfeitamente posicionado acima do botão R
+        this.containerBotoes.add(this.add.text(cx + 75, bumperY - 12, "CORRER", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
+        }).setOrigin(0.5));
+
+        // Base do Gamepad
+        graficosBotoes.lineStyle(2, 0x00f3ff, 0.5);
+        graficosBotoes.fillStyle(0x001a33, 0.3);
+        graficosBotoes.fillRoundedRect(cx - 130, cy - 40, 260, 110, 35);
+        graficosBotoes.strokeRoundedRect(cx - 130, cy - 40, 260, 110, 35);
+
+        graficosBotoes.fillStyle(0x00f3ff, 0.15);
+        graficosBotoes.lineStyle(2, 0x00f3ff, 0.8);
+        const dX = cx - 70;
+        const dY = cy + 15;
+        
+        graficosBotoes.beginPath();
+        graficosBotoes.moveTo(dX - 8, dY - 25); graficosBotoes.lineTo(dX + 8, dY - 25);
+        graficosBotoes.lineTo(dX + 8, dY - 8); graficosBotoes.lineTo(dX + 25, dY - 8);
+        graficosBotoes.lineTo(dX + 25, dY + 8); graficosBotoes.lineTo(dX + 8, dY + 8);
+        graficosBotoes.lineTo(dX + 8, dY + 25); graficosBotoes.lineTo(dX - 8, dY + 25);
+        graficosBotoes.lineTo(dX - 8, dY + 8); graficosBotoes.lineTo(dX - 25, dY + 8);
+        graficosBotoes.lineTo(dX - 25, dY - 8); graficosBotoes.lineTo(dX - 8, dY - 8);
+        graficosBotoes.closePath(); graficosBotoes.fillPath(); graficosBotoes.strokePath();
+
+        this.containerBotoes.add(this.add.text(dX, dY + 45, "MOVER", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
+        }).setOrigin(0.5));
+
+        // Função de desenho atualizada para permitir o controle do deslocamento no eixo X e Y (evita overlap)
+        const drawBtn = (bx, by, label, isHighlight, desc, descOffX, descOffY) => {
+            const cor = isHighlight ? 0xff9900 : 0x00f3ff;
+            graficosBotoes.lineStyle(2, cor, 0.8);
+            graficosBotoes.fillStyle(isHighlight ? 0x331a00 : 0x001a33, 0.8);
+            graficosBotoes.fillCircle(bx, by, 14);
+            graficosBotoes.strokeCircle(bx, by, 14);
+            this.containerBotoes.add(this.add.text(bx, by, label, { 
+                fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: isHighlight ? "#ff9900" : "#00f3ff", fontStyle: "bold" 
+            }).setOrigin(0.5));
+            if (desc) {
+                this.containerBotoes.add(this.add.text(bx + descOffX, by + descOffY, desc, { 
+                    fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
+                }).setOrigin(0.5));
+            }
+        };
+
+        const bX = cx + 70;
+        const bY = cy + 15;
+        
+        // BATER colocado ao lado direito (40px) e CORRER ao lado esquerdo (-45px), liberando espaço superior!
+        drawBtn(bX, bY - 28, "X", true, "BATER", 40, 0); 
+        drawBtn(bX - 28, bY, "Y", true, "CORRER", -45, 0); 
+        drawBtn(bX, bY + 28, "B", true, "PULAR", 0, 25);  
+        drawBtn(bX + 28, bY, "A", false, "", 0, 0);  
+
+        graficosBotoes.lineStyle(2, 0x00f3ff, 0.5);
+        graficosBotoes.strokeRect(cx - 25, cy + 25, 18, 6);
+        graficosBotoes.strokeRect(cx + 7, cy + 25, 18, 6);
+
+        const txtSkip = this.add.text(sw/2, sh - 45, "[ PRESSIONE QUALQUER BOTÃO PARA INICIAR A SIMULAÇÃO ]", {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: "#00ff66"
+        }).setOrigin(0.5);
+        this.containerBotoes.add(txtSkip);
+        this.tweens.add({ targets: txtSkip, alpha: { from: 0.3, to: 1 }, duration: 600, yoyo: true, repeat: -1 });
+
+        this._tecladoListener = () => this.confirmarControles();
+        this._mouseListener = () => this.confirmarControles();
+
+        this.input.keyboard.once('keydown', this._tecladoListener);
+        this.input.once('pointerdown', this._mouseListener);
+        
+        this.podeFecharComGamepad = true; 
+    }
+
+    confirmarControles() {
+        if (!this.jogadoresProntos) {
+            if (this._tecladoListener) this.input.keyboard.off('keydown', this._tecladoListener);
+            if (this._mouseListener) this.input.off('pointerdown', this._mouseListener);
+
+            let vol = this.game.volumeSFX !== undefined ? this.game.volumeSFX * 0.5 : 0.3;
+            if (this.cache.audio.exists('sfx_clicar_botao')) {
+                this.sound.play('sfx_clicar_botao', {volume: vol});
+            } else if (this.cache.audio.exists('click')) {
+                this.sound.play('click', {volume: vol});
+            }
+            this.containerBotoes.setVisible(false);
+            this.iniciarPartida();
+        }
+    }
+
+    iniciarPartida() {
+        if (this.jogadoresProntos) return;
+        this.jogadoresProntos = true;
+        this.tweens.add({
+            targets: this.overlayControles, alpha: 0, duration: 300,
+            onComplete: () => { this.overlayControles.setVisible(false); }
+        });
     }
 
     pararSonsMovimento() {
-        if (this.somAndando) {
-            this.somAndando.stop();
-            this.somAndando.destroy();
-        }
-        if (this.somCorrendo) {
-            this.somCorrendo.stop();
-            this.somCorrendo.destroy();
-        }
+        if (this.somAndando) { this.somAndando.stop(); this.somAndando.destroy(); }
+        if (this.somCorrendo) { this.somCorrendo.stop(); this.somCorrendo.destroy(); }
     }
 
     configurarAnimacoes() {
-        const char = this.personagemInicial; // 'solar' ou 'fornalha'
-        
-        if (!this.anims.exists(`${char}_walk`)) {
-            this.anims.create({ key: `${char}_walk`, frames: this.anims.generateFrameNumbers(`${char}_andando`, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
-        }
-        if (!this.anims.exists(`${char}_run`)) {
-            this.anims.create({ key: `${char}_run`, frames: this.anims.generateFrameNumbers(`${char}_correndo`, { start: 1, end: 2 }), frameRate: 15 });
-        }
-        if (!this.anims.exists(`${char}_jump`)) {
-            this.anims.create({ key: `${char}_jump`, frames: this.anims.generateFrameNumbers(`${char}_pulando`, { start: 2, end: 2 }), frameRate: 100 });
-        }
-        if (!this.anims.exists(`${char}_fall`)) {
-            this.anims.create({ key: `${char}_fall`, frames: this.anims.generateFrameNumbers(`${char}_caindo`, { start: 2, end: 2 }), frameRate: 10 });
-        }
-        if (!this.anims.exists(`${char}_wallSlide`)) {
-            this.anims.create({ key: `${char}_wallSlide`, frames: this.anims.generateFrameNumbers(`${char}_deslizando`, { start: 1, end: 1 }), frameRate: 10 });
-        }
+        const char = this.personagemInicial; 
+        if (!this.anims.exists(`${char}_walk`)) this.anims.create({ key: `${char}_walk`, frames: this.anims.generateFrameNumbers(`${char}_andando`, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
+        if (!this.anims.exists(`${char}_run`)) this.anims.create({ key: `${char}_run`, frames: this.anims.generateFrameNumbers(`${char}_correndo`, { start: 1, end: 2 }), frameRate: 15 });
+        if (!this.anims.exists(`${char}_jump`)) this.anims.create({ key: `${char}_jump`, frames: this.anims.generateFrameNumbers(`${char}_pulando`, { start: 2, end: 2 }), frameRate: 100 });
+        if (!this.anims.exists(`${char}_fall`)) this.anims.create({ key: `${char}_fall`, frames: this.anims.generateFrameNumbers(`${char}_caindo`, { start: 2, end: 2 }), frameRate: 10 });
+        if (!this.anims.exists(`${char}_wallSlide`)) this.anims.create({ key: `${char}_wallSlide`, frames: this.anims.generateFrameNumbers(`${char}_deslizando`, { start: 1, end: 1 }), frameRate: 10 });
     }
 
     adicionarFiltroVisao() {
@@ -282,19 +484,15 @@ export class Mapa3 extends Scene {
                 g.fillCircle(x + (45 * multX), y + (10 * multY), 3);
                 g.fillCircle(x + (10 * multX), y + (45 * multY), 3);
             };
-            drawScrap(0, 0, 1, 1);
-            drawScrap(sw, 0, -1, 1);
-            drawScrap(0, sh, 1, -1);
-            drawScrap(sw, sh, -1, -1);
+            drawScrap(0, 0, 1, 1); drawScrap(sw, 0, -1, 1);
+            drawScrap(0, sh, 1, -1); drawScrap(sw, sh, -1, -1);
             uiContainer.add(g);
 
             if (!this.textures.exists('scanlines_fornalha')) {
                 const scanCanvas = this.textures.createCanvas('scanlines_fornalha', sw, sh);
                 const ctx = scanCanvas.context;
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-                for (let y = 0; y < sh; y += 6) {
-                    ctx.fillRect(0, y, sw, 2);
-                }
+                for (let y = 0; y < sh; y += 6) ctx.fillRect(0, y, sw, 2);
                 scanCanvas.refresh();
             }
             uiContainer.add(this.add.image(0, 0, 'scanlines_fornalha').setOrigin(0,0).setAlpha(0.6));
@@ -303,21 +501,44 @@ export class Mapa3 extends Scene {
 
     update() {
         if (this.jaEstaSaindo) return;
-        
-        // Puxa o volume global apenas uma vez no topo do update
-        const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
 
+        if (!this.jogadoresProntos && this.mostrarTutorialInicial) {
+            const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+            const padAtivo = pad || (typeof navigator !== 'undefined' && navigator.getGamepads && navigator.getGamepads().filter(p => p).length > 0);
+            
+            if (padAtivo && this.podeFecharComGamepad) {
+                let apertouGamepad = false;
+                if (pad && pad.buttons) {
+                    for (let i = 0; i < pad.buttons.length; i++) {
+                        if (pad.buttons[i].pressed || pad.buttons[i].value > 0.5) apertouGamepad = true;
+                    }
+                }
+                if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+                    const rawPads = navigator.getGamepads();
+                    for (let p = 0; p < rawPads.length; p++) {
+                        if (rawPads[p] && rawPads[p].buttons) {
+                            for (let b = 0; b < rawPads[p].buttons.length; b++) {
+                                if (rawPads[p].buttons[b].pressed || rawPads[p].buttons[b].value > 0.5) apertouGamepad = true;
+                            }
+                        }
+                    }
+                }
+
+                if (apertouGamepad) {
+                    this.confirmarControles();
+                    this.podeFecharComGamepad = false;
+                }
+            }
+        }
+        
+        const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
         const limiteQueda = this.mapaAlturaTotal + 20;
         
         if (this.jogadorAtual && this.jogadorAtual.y > limiteQueda && !this.jogadorAtual.estaRenascendo) {
             this.jogadorAtual.estaRenascendo = true;
 
-            if (this.somQueda) {
-                this.somQueda.stop();
-                this.somQueda.play({ volume: volSFX });
-            } else if (this.cache.audio.has('caindo')) {
-                this.sound.play('caindo', { volume: volSFX });
-            }
+            if (this.somQueda) { this.somQueda.stop(); this.somQueda.play({ volume: volSFX }); }
+            else if (this.cache.audio.has('caindo')) { this.sound.play('caindo', { volume: volSFX }); }
 
             this.jogadorAtual.setVisible(false);
             if (this.jogadorAtual.body) this.jogadorAtual.body.setEnable(false);
@@ -348,7 +569,8 @@ export class Mapa3 extends Scene {
             this.socket.emit('enviarPosicao', { 
                 x: activePlayer.x, 
                 y: activePlayer.y,
-                cena: this.scene.key
+                cena: this.scene.key,
+                pronto: this.isKicking ? 'chutou' : false
             });
         }
 
@@ -357,12 +579,10 @@ export class Mapa3 extends Scene {
         this.apertouA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.apertouD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
         this.apertouShift = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+        this.apertouE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.apertouCtrl = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL);
 
-        // ==========================================
-        // MAPEAMENTO HÍBRIDO NATIVO (Xbox + PlayStation + SNES)
-        // ==========================================
         const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
-        
         const isBtnPressed = (padObj, index) => {
             if (padObj && padObj.buttons && padObj.buttons[index]) {
                 if (padObj.buttons[index].pressed || padObj.buttons[index].value > 0.5) return true;
@@ -394,30 +614,89 @@ export class Mapa3 extends Scene {
             return 0;
         };
 
-        let indoEsquerda = this.cursors.left.isDown || this.apertouA.isDown;
+let indoEsquerda = this.cursors.left.isDown || this.apertouA.isDown;
         let indoDireita = this.cursors.right.isDown || this.apertouD.isDown;
         let tentouPular = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space) || this.apertouW.isDown;
         let estaCorrendo = this.apertouShift.isDown;
+        
+        // --- SISTEMA DE CHUTE ---
+        let apertouBaterAgora = false;
+        if (this.apertouE.isDown || this.apertouCtrl.isDown) apertouBaterAgora = true;
 
         const padAtivo = pad || (typeof navigator !== 'undefined' && navigator.getGamepads && navigator.getGamepads().filter(p => p).length > 0);
 
         if (padAtivo) {
-            const axisX = (pad && pad.leftStick ? pad.leftStick.x : 0) || getAxisValue(pad, 0);
+            const axisX = (pad && pad.leftStick ? pad.leftStick.x : 0) || getAxisValue(pad, 2);
             
             if (axisX < -0.2 || (pad && pad.left) || isBtnPressed(pad, 14)) indoEsquerda = true;
             if (axisX > 0.2 || (pad && pad.right) || isBtnPressed(pad, 15)) indoDireita = true;
 
-            // B0 (A), B1 (B) = Pular | B2 (X), B3 (Y), L, R = Correr
-            if (isBtnPressed(pad, 2) || (pad && pad.A)) tentouPular = true;
+            if (isBtnPressed(pad, 2)) tentouPular = true;
             if (isBtnPressed(pad, 3) || isBtnPressed(pad, 5) || (pad && pad.R2 && pad.R2 > 0.1)) estaCorrendo = true;
 
-            // B8 (Select), B9 (Start) = Sair
+            // ⚠️ CORREÇÃO AQUI: Mudado para 'apertouBaterAgora' em vez de 'apertouBater'
+            if (isBtnPressed(pad, 0)) apertouBaterAgora = true;
+
             if (isBtnPressed(pad, 8) || isBtnPressed(pad, 9)) {
-                if (this.scene.isActive('Mapa3')) { 
-                    this.scene.stop('Mapa3');
+                if (this.scene.isActive(this.scene.key)) { 
+                    this.scene.stop(this.scene.key);
+                    this.pararSonsMovimento();
                     this.scene.start('MainMenu');
                 }
                 return;
+            }
+        }
+
+        if (apertouBaterAgora && !this.ultimoEstadoBater && !this.isKicking) {
+            this.isKicking = true;
+            
+            // --- LÓGICA DO EFEITO SONORO "SFX_BATER" ---
+            // Verifica se o outro jogador existe na tela e está visível
+            if (this.outroSprite && this.outroSprite.visible) {
+                // Calcula a distância entre você (jogadorAtual) e o outro sprite
+                const dist = Phaser.Math.Distance.Between(
+                    this.jogadorAtual.x, this.jogadorAtual.y, 
+                    this.outroSprite.x, this.outroSprite.y
+                );
+                
+                // Você pediu um raio de 5 pixels. 
+                // DICA: Em jogos 2D, 5 pixels significa que os personagens estão praticamente sobrepostos um no outro (o hitbox do seu chute real é de 70 pixels no código). 
+                // Se notar que o som não está saindo quando você bate, recomendo alterar o "5" para "50" ou "70".
+                if (dist <= 5) {
+                    const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
+                    this.sound.play('sfx_bater', { volume: volSFX });
+                }
+            }
+            // ------------------------------------------
+
+            setTimeout(() => this.isKicking = false, 400); 
+        }
+        this.ultimoEstadoBater = apertouBaterAgora;
+
+        if (!this.jogadoresProntos) {
+            // ⚠️ CORREÇÃO AQUI: Adicionado 'apertouBaterAgora = false;' para não bater no tutorial
+            indoEsquerda = false; indoDireita = false; tentouPular = false; estaCorrendo = false; apertouBaterAgora = false;
+            if (padAtivo && this.podeFecharComGamepad) {
+                let apertouGamepad = false;
+                if (pad && pad.buttons) {
+                    for (let i = 0; i < pad.buttons.length; i++) {
+                        if (isBtnPressed(pad, i)) apertouGamepad = true;
+                    }
+                }
+                if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+                    const rawPads = navigator.getGamepads();
+                    for (let p = 0; p < rawPads.length; p++) {
+                        if (rawPads[p] && rawPads[p].buttons) {
+                            for (let b = 0; b < rawPads[p].buttons.length; b++) {
+                                if (rawPads[p].buttons[b].pressed || rawPads[p].buttons[b].value > 0.5) apertouGamepad = true;
+                            }
+                        }
+                    }
+                }
+                if (apertouGamepad) {
+                    this.confirmarControles();
+                    this.podeFecharComGamepad = false;
+                }
             }
         }
 
@@ -429,61 +708,53 @@ export class Mapa3 extends Scene {
         const velocidadeMax = estaCorrendo ? 260 : 160; 
         const impulsoParedeX = estaCorrendo ? 320 : 220; 
 
-        // 1. PULO NORMAL E DESLIZE
+        if (this.jogadorAtual.stunned) {
+            indoEsquerda = false;
+            indoDireita = false;
+            tentouPular = false;
+        }
+
         if (tentouPular && noChao) {
             activePlayer.setVelocityY(-400); 
             if (this.somPulando) this.somPulando.play({ volume: 0.4 * volSFX });
         }
         if (estaNaParede) activePlayer.setVelocityY(50); 
 
-        // 2. PULO NA PAREDE CORRIGIDO
         if (tentouPular && estaNaParede) {
-            // Verifica a FÍSICA da parede tocada (body.blocked), ignorando o botão apertado
             if (body.blocked.left) {
-                // Parede está à esquerda -> Lança para a DIREITA
-                activePlayer.setVelocityX(impulsoParedeX); 
-                activePlayer.setVelocityY(-380);
-                activePlayer.setFlipX(false);
+                activePlayer.setVelocityX(impulsoParedeX); activePlayer.setVelocityY(-380); activePlayer.setFlipX(false);
             } else if (body.blocked.right) {
-                // Parede está à direita -> Lança para a ESQUERDA
-                activePlayer.setVelocityX(-impulsoParedeX); 
-                activePlayer.setVelocityY(-380);
-                activePlayer.setFlipX(true);
+                activePlayer.setVelocityX(-impulsoParedeX); activePlayer.setVelocityY(-380); activePlayer.setFlipX(true);
             }
             if (this.somPulando) this.somPulando.play({ volume: 0.4 * volSFX });
         }
 
-        // 3. SISTEMA DE ACELERAÇÃO (MOMENTUM ESTILO SUPER MARIO WORLD)
-        let vx = activePlayer.body.velocity.x;
-        
-        // Ajuste estes valores para deixar o personagem mais "pesado" ou "escorregadio"
-        const aceleracao = noChao ? 18 : 10; // Acelera mais rápido no chão, tem mais inércia no ar
-        const atrito = noChao ? 25 : 5;      // Atrito forte no chão, no ar demora para virar (air control)
+        if (!this.jogadorAtual.stunned) {
+            let vx = activePlayer.body.velocity.x;
+            const aceleracao = noChao ? 18 : 10; 
+            const atrito = noChao ? 25 : 5;      
 
-        if (indoEsquerda) {
-            vx -= aceleracao;
-            if (vx < -velocidadeMax) vx = -velocidadeMax;
-            activePlayer.setFlipX(true);
-        } else if (indoDireita) {
-            vx += aceleracao;
-            if (vx > velocidadeMax) vx = velocidadeMax;
-            activePlayer.setFlipX(false);
-        } else {
-            // Atrito aplicado quando o jogador solta o analógico/teclado (Mario derrapando até parar)
-            if (vx > 0) {
-                vx -= atrito;
-                if (vx < 0) vx = 0;
-            } else if (vx < 0) {
-                vx += atrito;
-                if (vx > 0) vx = 0;
+            if (indoEsquerda) {
+                vx -= aceleracao;
+                if (vx < -velocidadeMax) vx = -velocidadeMax;
+                activePlayer.setFlipX(true);
+            } else if (indoDireita) {
+                vx += aceleracao;
+                if (vx > velocidadeMax) vx = velocidadeMax;
+                activePlayer.setFlipX(false);
+            } else {
+                if (vx > 0) {
+                    vx -= atrito;
+                    if (vx < 0) vx = 0;
+                } else if (vx < 0) {
+                    vx += atrito;
+                    if (vx > 0) vx = 0;
+                }
             }
+            activePlayer.setVelocityX(vx);
         }
 
-        activePlayer.setVelocityX(vx);
-
         const char = this.personagemInicial; 
-
-        // Função rápida para calar os passos se estiver no ar ou parado
         const silenciarPassos = () => {
             if (this.somAndando && this.somAndando.isPlaying) this.somAndando.stop();
             if (this.somCorrendo && this.somCorrendo.isPlaying) this.somCorrendo.stop();
@@ -496,7 +767,7 @@ export class Mapa3 extends Scene {
             if (body.velocity.y < 0) activePlayer.anims.play(`${char}_jump`, true);
             else activePlayer.anims.play(`${char}_fall`, true);
             silenciarPassos();
-        } else if (body.velocity.x !== 0) {
+        } else if (body.velocity.x !== 0 && !this.jogadorAtual.stunned) {
             if (estaCorrendo) {
                 activePlayer.anims.play(`${char}_run`, true);
                 if (this.somAndando.isPlaying) this.somAndando.stop();
@@ -540,6 +811,7 @@ export class Mapa3 extends Scene {
     irParaProximaFaseDireto() {
         if (this.jaEstaSaindo) return;
         this.jaEstaSaindo = true;
+        this.pararSonsMovimento();
         this.cameras.main.fadeOut(500, 0, 0, 0);
         this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
             if (this.scene.isActive('Mapa3')) {

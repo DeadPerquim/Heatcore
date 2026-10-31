@@ -8,9 +8,9 @@ export class Game extends Scene {
     init(data) {
         this.personagemInicial = (data && data.personagem) ? data.personagem : (this.game.meuPersonagem || 'solar');
         this.outroPersonagemTipo = this.personagemInicial === 'solar' ? 'fornalha' : 'solar';
-        
         this.pontosSolar = data ? (data.pontosSolar || 0) : 0;
         this.pontosFornalha = data ? (data.pontosFornalha || 0) : 0;
+        this.mostrarTutorialInicial = data ? (data.mostrarTutorial || false) : false;
     }
 
     create() {
@@ -91,6 +91,7 @@ export class Game extends Scene {
         this.jogadorAtual.spawnX = this.jogadorAtual.x;
         this.jogadorAtual.spawnY = this.jogadorAtual.y;
         this.jogadorAtual.estaRenascendo = false;
+        this.jogadorAtual.stunned = false;
 
         const coordOutro = posicoesSpawn[this.outroPersonagemTipo];
         const chaveSpriteOutro = this.outroPersonagemTipo === 'solar' ? 'solar_andando' : 'fornalha_andando';
@@ -105,12 +106,6 @@ export class Game extends Scene {
                 const dadosOutro = posicoes[this.outroPersonagemTipo];
                 
                 if (dadosOutro) {
-                    if (this.estadoProntidao && !this.jogadoresProntos) {
-                        if (dadosOutro.cena === this.scene.key && dadosOutro.pronto) {
-                            this.iniciarPartida();
-                        }
-                    }
-
                     if (this.outroSprite) {
                         if ((dadosOutro.x === 0 && dadosOutro.y === 0) || (dadosOutro.cena && dadosOutro.cena !== this.scene.key)) {
                             this.outroSprite.setVisible(false);
@@ -118,6 +113,20 @@ export class Game extends Scene {
                             this.outroSprite.x = dadosOutro.x;
                             this.outroSprite.y = dadosOutro.y;
                             this.outroSprite.setVisible(true);
+
+                            // ====== LÓGICA DE RECEBER CHUTE ======
+                            if (dadosOutro.pronto === 'chutou' && !this.levouChute && this.jogadorAtual && !this.jogadorAtual.estaRenascendo) {
+                                const dist = Phaser.Math.Distance.Between(this.jogadorAtual.x, this.jogadorAtual.y, this.outroSprite.x, this.outroSprite.y);
+                                if (dist < 70 && Math.abs(this.jogadorAtual.y - this.outroSprite.y) < 50) {
+                                    this.levouChute = true;
+                                    this.jogadorAtual.stunned = true;
+                                    const direcao = this.jogadorAtual.x < this.outroSprite.x ? -1 : 1;
+                                    this.jogadorAtual.setVelocity(direcao * 350, -250);
+                                    
+                                    setTimeout(() => { if (this.jogadorAtual) this.jogadorAtual.stunned = false; }, 300);
+                                    setTimeout(() => { this.levouChute = false; }, 800);
+                                }
+                            }
 
                             if (this.timeoutOutroJogador) clearTimeout(this.timeoutOutroJogador);
                             this.timeoutOutroJogador = setTimeout(() => {
@@ -147,10 +156,14 @@ export class Game extends Scene {
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.jaEstaSaindo = false;
+        this.isKicking = false;
+        this.levouChute = false;
+        this.ultimoEstadoBater = false;
 
         this.input.keyboard.on('keydown', (event) => {
             if (this.jaEstaSaindo) return;
-            if (event.key === 'e' || event.key === 'E') {
+            // Mudança para 'Q' na lanterna para liberar o 'E' para bater
+            if (event.key === 'q' || event.key === 'Q') {
                 this.escuroAtivo = !this.escuroAtivo;
                 if (this.escuridaoSprite) this.escuridaoSprite.setVisible(this.escuroAtivo);
             }
@@ -165,14 +178,16 @@ export class Game extends Scene {
         this.somCorrendo = this.sound.add('sfx_andando', { loop: true, volume: 0.25 * volSFX, rate: rateCorrendo });
         this.somPulando = this.sound.add('sfx_pulando', { volume: 0.4 * volSFX });
 
-        this.estadoProntidao = false;
-        this.jogadoresProntos = false;
-        this.criarOverlayControles();
+        if (this.mostrarTutorialInicial) {
+            this.criarOverlayControles();
+        }
     }
 
-    criarOverlayControles() {
+criarOverlayControles() {
         const sw = this.scale.width;
         const sh = this.scale.height;
+
+        this.jogadoresProntos = false; 
 
         this.overlayControles = this.add.container(0, 0).setDepth(3000);
         this.overlayControles.setScrollFactor(0);
@@ -193,7 +208,7 @@ export class Game extends Scene {
         graficosFixos.moveTo(20, sh - 20 - l); graficosFixos.lineTo(20, sh - 20); graficosFixos.lineTo(20 + l, sh - 20);
         graficosFixos.moveTo(sw - 20 - l, sh - 20); graficosFixos.lineTo(sw - 20, sh - 20); graficosFixos.lineTo(sw - 20, sh - 20 - l);
 
-        this.overlayControles.add(this.add.text(40, 40, "SYS_STATUS // AWAITING_INPUT...", {
+        this.overlayControles.add(this.add.text(40, 40, "SYS_STATUS // ESPERANDO INPUT...", {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#00f3ff"
         }).setAlpha(0.6));
 
@@ -214,7 +229,9 @@ export class Game extends Scene {
         graficosBotoes.lineStyle(1, 0x00f3ff, 0.3);
         graficosBotoes.lineBetween(sw/2, sh*0.25, sw/2, sh*0.80);
 
+        // ===================================
         // DESENHO DO TECLADO
+        // ===================================
         const kx = sw * 0.25;
         const ky = sh * 0.50;
 
@@ -246,8 +263,13 @@ export class Game extends Scene {
         drawKey(kx + 30, ky + 20, 50, 50, "D", "DIR.", false);
         drawKey(kx - 160, ky + 20, 70, 50, "SHIFT", "CORRER", false);
         drawKey(kx - 80, ky + 100, 160, 40, "ESPAÇO", "PULAR", true);
+        
+        drawKey(kx + 30, ky - 40, 50, 50, "E", "BATER", true); 
+        drawKey(kx - 160, ky + 100, 70, 40, "CTRL", "BATER", true); 
 
+        // ===================================
         // DESENHO DO GAMEPAD
+        // ===================================
         const cx = sw * 0.75;
         const cy = sh * 0.50;
 
@@ -255,6 +277,31 @@ export class Game extends Scene {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 20, color: "#ffffff", fontStyle: "bold" 
         }).setOrigin(0.5));
 
+        // Botões L e R (Movidos mais para cima para não esmagar o botão X)
+        const bumperY = cy - 80;
+
+        graficosBotoes.lineStyle(2, 0x00f3ff, 0.8);
+        graficosBotoes.fillStyle(0x001a33, 0.8);
+        graficosBotoes.fillRoundedRect(cx - 100, bumperY, 50, 18, 5); // L
+        graficosBotoes.strokeRoundedRect(cx - 100, bumperY, 50, 18, 5);
+        this.containerBotoes.add(this.add.text(cx - 75, bumperY + 9, "L", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: "#00f3ff", fontStyle: "bold" 
+        }).setOrigin(0.5));
+
+        graficosBotoes.lineStyle(2, 0xff9900, 0.8);
+        graficosBotoes.fillStyle(0x331a00, 0.8);
+        graficosBotoes.fillRoundedRect(cx + 50, bumperY, 50, 18, 5); // R
+        graficosBotoes.strokeRoundedRect(cx + 50, bumperY, 50, 18, 5);
+        this.containerBotoes.add(this.add.text(cx + 75, bumperY + 9, "R", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: "#ff9900", fontStyle: "bold" 
+        }).setOrigin(0.5));
+        
+        // TEXTO "CORRER" perfeitamente posicionado acima do botão R
+        this.containerBotoes.add(this.add.text(cx + 75, bumperY - 12, "CORRER", { 
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
+        }).setOrigin(0.5));
+
+        // Base do Gamepad
         graficosBotoes.lineStyle(2, 0x00f3ff, 0.5);
         graficosBotoes.fillStyle(0x001a33, 0.3);
         graficosBotoes.fillRoundedRect(cx - 130, cy - 40, 260, 110, 35);
@@ -278,7 +325,8 @@ export class Game extends Scene {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
         }).setOrigin(0.5));
 
-        const drawBtn = (bx, by, label, isHighlight, desc, descOffY) => {
+        // Função de desenho atualizada para permitir o controle do deslocamento no eixo X e Y (evita overlap)
+        const drawBtn = (bx, by, label, isHighlight, desc, descOffX, descOffY) => {
             const cor = isHighlight ? 0xff9900 : 0x00f3ff;
             graficosBotoes.lineStyle(2, cor, 0.8);
             graficosBotoes.fillStyle(isHighlight ? 0x331a00 : 0x001a33, 0.8);
@@ -288,7 +336,7 @@ export class Game extends Scene {
                 fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: isHighlight ? "#ff9900" : "#00f3ff", fontStyle: "bold" 
             }).setOrigin(0.5));
             if (desc) {
-                this.containerBotoes.add(this.add.text(bx, by + descOffY, desc, { 
+                this.containerBotoes.add(this.add.text(bx + descOffX, by + descOffY, desc, { 
                     fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
                 }).setOrigin(0.5));
             }
@@ -296,106 +344,69 @@ export class Game extends Scene {
 
         const bX = cx + 70;
         const bY = cy + 15;
-        // Padrão SNES: X(Top), Y(Left), B(Bottom), A(Right)
-        drawBtn(bX, bY - 28, "X", false, "", 0); // Topo
-        drawBtn(bX - 28, bY, "Y", true, "CORRER", -22); // Esquerda
-        drawBtn(bX, bY + 28, "B", true, "PULAR", 22);  // Baixo
-        drawBtn(bX + 28, bY, "A", false, "", 0);  // Direita
+        
+        // BATER colocado ao lado direito (40px) e CORRER ao lado esquerdo (-45px), liberando espaço superior!
+        drawBtn(bX, bY - 28, "X", true, "BATER", 40, 0); 
+        drawBtn(bX - 28, bY, "Y", true, "CORRER", -45, 0); 
+        drawBtn(bX, bY + 28, "B", true, "PULAR", 0, 25);  
+        drawBtn(bX + 28, bY, "A", false, "", 0, 0);  
 
         graficosBotoes.lineStyle(2, 0x00f3ff, 0.5);
         graficosBotoes.strokeRect(cx - 25, cy + 25, 18, 6);
         graficosBotoes.strokeRect(cx + 7, cy + 25, 18, 6);
 
-        const txtSkip = this.add.text(sw/2, sh - 45, "[ PRESSIONE QUALQUER BOTÃO PARA CONTINUAR ]", {
+        const txtSkip = this.add.text(sw/2, sh - 45, "[ PRESSIONE QUALQUER BOTÃO PARA INICIAR A SIMULAÇÃO ]", {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: "#00ff66"
         }).setOrigin(0.5);
         this.containerBotoes.add(txtSkip);
         this.tweens.add({ targets: txtSkip, alpha: { from: 0.3, to: 1 }, duration: 600, yoyo: true, repeat: -1 });
 
-        this.txtStatusCentro = this.add.text(sw / 2, sh / 2, "[ ESPERANDO A CONEXÃO DO OUTRO JOGADOR... ]", {
-            fontFamily: "'Courier New', Courier, monospace",
-            fontSize: 24,
-            color: "#ff9900",
-            align: 'center',
-            stroke: "#000",
-            strokeThickness: 4,
-            shadow: { offsetX: 0, offsetY: 0, color: '#ff9900', blur: 8, fill: true }
-        }).setOrigin(0.5).setVisible(false);
-        
-        this.overlayControles.add(this.txtStatusCentro);
-        this.tweens.add({ targets: this.txtStatusCentro, alpha: { from: 0.4, to: 1 }, duration: 800, yoyo: true, repeat: -1 });
+        this._tecladoListener = () => this.confirmarControles();
+        this._mouseListener = () => this.confirmarControles();
 
-        this.input.keyboard.on('keydown', () => this.confirmarControles());
-        this.input.on('pointerdown', () => this.confirmarControles());
+        this.input.keyboard.once('keydown', this._tecladoListener);
+        this.input.once('pointerdown', this._mouseListener);
         
         this.podeFecharComGamepad = true; 
     }
 
     confirmarControles() {
-        if (!this.estadoProntidao) {
-            this.estadoProntidao = true; 
-            
+        if (!this.jogadoresProntos) {
+            if (this._tecladoListener) this.input.keyboard.off('keydown', this._tecladoListener);
+            if (this._mouseListener) this.input.off('pointerdown', this._mouseListener);
+
+            let vol = this.game.volumeSFX !== undefined ? this.game.volumeSFX * 0.5 : 0.3;
             if (this.cache.audio.exists('sfx_clicar_botao')) {
-                this.sound.play('sfx_clicar_botao', { volume: 0.5 });
+                this.sound.play('sfx_clicar_botao', {volume: vol});
+            } else if (this.cache.audio.exists('click')) {
+                this.sound.play('click', {volume: vol});
             }
-
             this.containerBotoes.setVisible(false);
-            this.txtStatusCentro.setVisible(true);
-
-            if (!this.socket) {
-                this.iniciarPartida();
-            }
+            this.iniciarPartida();
         }
     }
 
     iniciarPartida() {
         if (this.jogadoresProntos) return;
         this.jogadoresProntos = true;
-        
-        this.txtStatusCentro.setText("[ CONEXÃO ESTABELECIDA ]\n>> INICIANDO SIMULAÇÃO <<");
-        this.txtStatusCentro.setColor("#00ff66");
-        this.txtStatusCentro.setShadow(0, 0, '#00ff66', 8, true);
-        
-        this.time.delayedCall(800, () => {
-            this.tweens.add({
-                targets: this.overlayControles,
-                alpha: 0,
-                duration: 300,
-                onComplete: () => {
-                    this.overlayControles.setVisible(false);
-                }
-            });
+        this.tweens.add({
+            targets: this.overlayControles, alpha: 0, duration: 300,
+            onComplete: () => { this.overlayControles.setVisible(false); }
         });
     }
 
     pararSonsMovimento() {
-        if (this.somAndando) {
-            this.somAndando.stop();
-            this.somAndando.destroy();
-        }
-        if (this.somCorrendo) {
-            this.somCorrendo.stop();
-            this.somCorrendo.destroy();
-        }
+        if (this.somAndando) { this.somAndando.stop(); this.somAndando.destroy(); }
+        if (this.somCorrendo) { this.somCorrendo.stop(); this.somCorrendo.destroy(); }
     }
 
     configurarAnimacoes() {
         const char = this.personagemInicial;
-        if (!this.anims.exists(`${char}_walk`)) {
-            this.anims.create({ key: `${char}_walk`, frames: this.anims.generateFrameNumbers(`${char}_andando`, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
-        }
-        if (!this.anims.exists(`${char}_run`)) {
-            this.anims.create({ key: `${char}_run`, frames: this.anims.generateFrameNumbers(`${char}_correndo`, { start: 1, end: 2 }), frameRate: 15 });
-        }
-        if (!this.anims.exists(`${char}_jump`)) {
-            this.anims.create({ key: `${char}_jump`, frames: this.anims.generateFrameNumbers(`${char}_pulando`, { start: 2, end: 2 }), frameRate: 100 });
-        }
-        if (!this.anims.exists(`${char}_fall`)) {
-            this.anims.create({ key: `${char}_fall`, frames: this.anims.generateFrameNumbers(`${char}_caindo`, { start: 2, end: 2 }), frameRate: 10 });
-        }
-        if (!this.anims.exists(`${char}_wallSlide`)) {
-            this.anims.create({ key: `${char}_wallSlide`, frames: this.anims.generateFrameNumbers(`${char}_deslizando`, { start: 1, end: 1 }), frameRate: 10 });
-        }
+        if (!this.anims.exists(`${char}_walk`)) this.anims.create({ key: `${char}_walk`, frames: this.anims.generateFrameNumbers(`${char}_andando`, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
+        if (!this.anims.exists(`${char}_run`)) this.anims.create({ key: `${char}_run`, frames: this.anims.generateFrameNumbers(`${char}_correndo`, { start: 1, end: 2 }), frameRate: 15 });
+        if (!this.anims.exists(`${char}_jump`)) this.anims.create({ key: `${char}_jump`, frames: this.anims.generateFrameNumbers(`${char}_pulando`, { start: 2, end: 2 }), frameRate: 100 });
+        if (!this.anims.exists(`${char}_fall`)) this.anims.create({ key: `${char}_fall`, frames: this.anims.generateFrameNumbers(`${char}_caindo`, { start: 2, end: 2 }), frameRate: 10 });
+        if (!this.anims.exists(`${char}_wallSlide`)) this.anims.create({ key: `${char}_wallSlide`, frames: this.anims.generateFrameNumbers(`${char}_deslizando`, { start: 1, end: 1 }), frameRate: 10 });
     }
 
     adicionarFiltroVisao() {
@@ -475,19 +486,15 @@ export class Game extends Scene {
                 g.fillCircle(x + (45 * multX), y + (10 * multY), 3);
                 g.fillCircle(x + (10 * multX), y + (45 * multY), 3);
             };
-            drawScrap(0, 0, 1, 1);
-            drawScrap(sw, 0, -1, 1);
-            drawScrap(0, sh, 1, -1);
-            drawScrap(sw, sh, -1, -1);
+            drawScrap(0, 0, 1, 1); drawScrap(sw, 0, -1, 1);
+            drawScrap(0, sh, 1, -1); drawScrap(sw, sh, -1, -1);
             uiContainer.add(g);
 
             if (!this.textures.exists('scanlines_fornalha')) {
                 const scanCanvas = this.textures.createCanvas('scanlines_fornalha', sw, sh);
                 const ctx = scanCanvas.context;
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-                for (let y = 0; y < sh; y += 6) {
-                    ctx.fillRect(0, y, sw, 2);
-                }
+                for (let y = 0; y < sh; y += 6) ctx.fillRect(0, y, sw, 2);
                 scanCanvas.refresh();
             }
             uiContainer.add(this.add.image(0, 0, 'scanlines_fornalha').setOrigin(0,0).setAlpha(0.6));
@@ -496,6 +503,35 @@ export class Game extends Scene {
 
     update() {
         if (this.jaEstaSaindo) return;
+
+        if (!this.jogadoresProntos && this.mostrarTutorialInicial) {
+            const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
+            const padAtivo = pad || (typeof navigator !== 'undefined' && navigator.getGamepads && navigator.getGamepads().filter(p => p).length > 0);
+            
+            if (padAtivo && this.podeFecharComGamepad) {
+                let apertouGamepad = false;
+                if (pad && pad.buttons) {
+                    for (let i = 0; i < pad.buttons.length; i++) {
+                        if (pad.buttons[i].pressed || pad.buttons[i].value > 0.5) apertouGamepad = true;
+                    }
+                }
+                if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+                    const rawPads = navigator.getGamepads();
+                    for (let p = 0; p < rawPads.length; p++) {
+                        if (rawPads[p] && rawPads[p].buttons) {
+                            for (let b = 0; b < rawPads[p].buttons.length; b++) {
+                                if (rawPads[p].buttons[b].pressed || rawPads[p].buttons[b].value > 0.5) apertouGamepad = true;
+                            }
+                        }
+                    }
+                }
+
+                if (apertouGamepad) {
+                    this.confirmarControles();
+                    this.podeFecharComGamepad = false;
+                }
+            }
+        }
         
         const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
         const activePlayer = this.jogadorAtual;
@@ -510,7 +546,7 @@ export class Game extends Scene {
                 x: activePlayer.x, 
                 y: activePlayer.y,
                 cena: this.scene.key,
-                pronto: this.estadoProntidao
+                pronto: this.isKicking ? 'chutou' : false
             });
         }
 
@@ -519,6 +555,8 @@ export class Game extends Scene {
         this.apertouA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.apertouD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
         this.apertouShift = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+        this.apertouE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.apertouCtrl = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL);
 
         const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
         const isBtnPressed = (padObj, index) => {
@@ -556,6 +594,10 @@ export class Game extends Scene {
         let indoDireita = this.cursors.right.isDown || this.apertouD.isDown;
         let tentouPular = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space) || this.apertouW.isDown;
         let estaCorrendo = this.apertouShift.isDown;
+        
+        // --- SISTEMA DE CHUTE ---
+        let apertouBaterAgora = false;
+        if (this.apertouE.isDown || this.apertouCtrl.isDown) apertouBaterAgora = true;
 
         const padAtivo = pad || (typeof navigator !== 'undefined' && navigator.getGamepads && navigator.getGamepads().filter(p => p).length > 0);
 
@@ -567,22 +609,28 @@ export class Game extends Scene {
             if (isBtnPressed(pad, 2) || (pad && pad.A)) tentouPular = true;
             if (isBtnPressed(pad, 3) || isBtnPressed(pad, 5) || (pad && pad.R2 && pad.R2 > 0.1)) estaCorrendo = true;
 
+            // Identificando o Botão de Topo (X no SNES) para o chute/soco
+            if (isBtnPressed(pad, 0)) apertouBater = true;
+
             if (isBtnPressed(pad, 8) || isBtnPressed(pad, 9)) {
                 if (this.scene.isActive('Game')) { 
                     this.scene.stop('Game');
+                    this.pararSonsMovimento();
                     this.scene.start('MainMenu');
                 }
                 return;
             }
         }
 
-        if (!this.jogadoresProntos) {
-            indoEsquerda = false;
-            indoDireita = false;
-            tentouPular = false;
-            estaCorrendo = false;
+        if (apertouBaterAgora && !this.ultimoEstadoBater && !this.isKicking) {
+            this.isKicking = true;
+            setTimeout(() => this.isKicking = false, 400); 
+        }
+        this.ultimoEstadoBater = apertouBaterAgora;
 
-            if (padAtivo && this.podeFecharComGamepad && !this.estadoProntidao) {
+        if (!this.jogadoresProntos) {
+            indoEsquerda = false; indoDireita = false; tentouPular = false; estaCorrendo = false;
+            if (padAtivo && this.podeFecharComGamepad) {
                 let apertouGamepad = false;
                 if (pad && pad.buttons) {
                     for (let i = 0; i < pad.buttons.length; i++) {
@@ -599,7 +647,6 @@ export class Game extends Scene {
                         }
                     }
                 }
-
                 if (apertouGamepad) {
                     this.confirmarControles();
                     this.podeFecharComGamepad = false;
@@ -614,6 +661,13 @@ export class Game extends Scene {
 
         const velocidadeMax = estaCorrendo ? 260 : 160; 
         const impulsoParedeX = estaCorrendo ? 320 : 220; 
+        
+        // Se levou o chute (stunned), anulamos o controle do player para simular o baque
+        if (this.jogadorAtual.stunned) {
+            indoEsquerda = false;
+            indoDireita = false;
+            tentouPular = false;
+        }
 
         if (tentouPular && noChao) {
             activePlayer.setVelocityY(-400); 
@@ -623,43 +677,40 @@ export class Game extends Scene {
 
         if (tentouPular && estaNaParede) {
             if (body.blocked.left) {
-                activePlayer.setVelocityX(impulsoParedeX); 
-                activePlayer.setVelocityY(-380);
-                activePlayer.setFlipX(false);
+                activePlayer.setVelocityX(impulsoParedeX); activePlayer.setVelocityY(-380); activePlayer.setFlipX(false);
             } else if (body.blocked.right) {
-                activePlayer.setVelocityX(-impulsoParedeX); 
-                activePlayer.setVelocityY(-380);
-                activePlayer.setFlipX(true);
+                activePlayer.setVelocityX(-impulsoParedeX); activePlayer.setVelocityY(-380); activePlayer.setFlipX(true);
             }
             if (this.somPulando) this.somPulando.play({ volume: 0.4 * volSFX });
         }
 
-        let vx = activePlayer.body.velocity.x;
-        const aceleracao = noChao ? 18 : 10; 
-        const atrito = noChao ? 25 : 5;      
+        // Deixamos a física do knockback fluir se estiver stunned (não sobrescrevemos vx com input ou atrito alto)
+        if (!this.jogadorAtual.stunned) {
+            let vx = activePlayer.body.velocity.x;
+            const aceleracao = noChao ? 18 : 10; 
+            const atrito = noChao ? 25 : 5;      
 
-        if (indoEsquerda) {
-            vx -= aceleracao;
-            if (vx < -velocidadeMax) vx = -velocidadeMax;
-            activePlayer.setFlipX(true);
-        } else if (indoDireita) {
-            vx += aceleracao;
-            if (vx > velocidadeMax) vx = velocidadeMax;
-            activePlayer.setFlipX(false);
-        } else {
-            if (vx > 0) {
-                vx -= atrito;
-                if (vx < 0) vx = 0;
-            } else if (vx < 0) {
-                vx += atrito;
-                if (vx > 0) vx = 0;
+            if (indoEsquerda) {
+                vx -= aceleracao;
+                if (vx < -velocidadeMax) vx = -velocidadeMax;
+                activePlayer.setFlipX(true);
+            } else if (indoDireita) {
+                vx += aceleracao;
+                if (vx > velocidadeMax) vx = velocidadeMax;
+                activePlayer.setFlipX(false);
+            } else {
+                if (vx > 0) {
+                    vx -= atrito;
+                    if (vx < 0) vx = 0;
+                } else if (vx < 0) {
+                    vx += atrito;
+                    if (vx > 0) vx = 0;
+                }
             }
+            activePlayer.setVelocityX(vx);
         }
 
-        activePlayer.setVelocityX(vx);
-
         const char = this.personagemInicial; 
-
         const silenciarPassos = () => {
             if (this.somAndando && this.somAndando.isPlaying) this.somAndando.stop();
             if (this.somCorrendo && this.somCorrendo.isPlaying) this.somCorrendo.stop();
@@ -672,7 +723,7 @@ export class Game extends Scene {
             if (body.velocity.y < 0) activePlayer.anims.play(`${char}_jump`, true);
             else activePlayer.anims.play(`${char}_fall`, true);
             silenciarPassos();
-        } else if (body.velocity.x !== 0) {
+        } else if (body.velocity.x !== 0 && !this.jogadorAtual.stunned) {
             if (estaCorrendo) {
                 activePlayer.anims.play(`${char}_run`, true);
                 if (this.somAndando.isPlaying) this.somAndando.stop();
@@ -717,6 +768,7 @@ export class Game extends Scene {
     irParaProximaFaseDireto() {
         if (this.jaEstaSaindo) return;
         this.jaEstaSaindo = true;
+        this.pararSonsMovimento();
         this.cameras.main.fadeOut(500, 0, 0, 0);
         this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
             if (this.scene.isActive('Game')) {
