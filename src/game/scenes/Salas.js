@@ -112,9 +112,35 @@ export class Salas extends Scene {
 
         this.atualizarInterfaceAtual();
 
-        this.socket.on('salaCriada', (salaInfo) => { this.estadoCena = "LOBBY"; this.salaAtual = salaInfo; this.atualizarInterfaceAtual(); });
-        this.socket.on('atualizacaoLobby', (salaInfo) => { this.salaAtual = salaInfo; if (this.estadoCena === "LOBBY") this.atualizarInterfaceAtual(); });
+        // ------------------------------------------
+        // EVENTOS DE REDE
+        // ------------------------------------------
 
+        // Alertas de erro do servidor
+        this.socket.off('erroLobby');
+        this.socket.on('erroLobby', (msg) => { alert("ALERTA DO SISTEMA:\n" + msg); });
+
+        // Quando o HOST cria a sala com sucesso
+        this.socket.off('salaCriada');
+        this.socket.on('salaCriada', (salaInfo) => { 
+            this.estadoCena = "LOBBY"; 
+            this.salaAtual = salaInfo; 
+            this.atualizarInterfaceAtual(); 
+        });
+
+        // Quando ocorrem atualizações na sala (ex: GUEST conectou)
+        this.socket.off('atualizacaoLobby');
+        this.socket.on('atualizacaoLobby', (salaInfo) => { 
+            this.salaAtual = salaInfo; 
+            
+            if (this.estadoCena !== "LOBBY") {
+                this.estadoCena = "LOBBY";
+            }
+            
+            this.atualizarInterfaceAtual(); 
+        });
+
+        this.socket.off('partidaIniciada');
         this.socket.on('partidaIniciada', (salaInfo) => {
             let musicaMenu = this.sound.get('menu');
             if (musicaMenu && musicaMenu.isPlaying) musicaMenu.stop();
@@ -129,13 +155,12 @@ export class Salas extends Scene {
 
             this.cameras.main.fadeOut(500, 0, 0, 0);
             this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-                // Passamos a flag 'mostrarTutorial: true' apenas quando a partida é iniciada do zero pelas salas!
                 this.scene.start(cenaDestino, { 
                     personagem: meuPersonagem, 
                     modoDiario: salaInfo.horarioTipo, 
                     pontosSolar: 0, 
                     pontosFornalha: 0,
-                    mostrarTutorial: true // <--- AQUI ESTÁ O SEGREDO
+                    mostrarTutorial: true
                 });
             });
         });
@@ -151,9 +176,10 @@ export class Salas extends Scene {
     }
 
     atualizarInterfaceAtual() {
-        if (this.mapOverlayContainer) return; // Não atualiza embaixo se o mapa está aberto
+        if (this.mapOverlayContainer) return; 
         
         this.painelContainer.removeAll(true);
+
         if (this.estadoCena === "CREATE_ROOM" || this.estadoCena === "SINGLEPLAYER") this.construirInterfaceCriacao();
         else if (this.estadoCena === "BROWSER") this.construirInterfaceBrowser();
         else if (this.estadoCena === "JOIN_CODE") this.construirInterfaceCodigo();
@@ -179,7 +205,7 @@ export class Salas extends Scene {
     criarCampoTexto(x, y, w, h, label, valor, campoId) {
         let isAtivo = this.campoEditando === campoId;
         
-        this.add.text(x, y - 22, label, { fontSize: 13, color: "#8888aa", fontFamily: "Courier" });
+        let lbl = this.add.text(x, y - 22, label, { fontSize: 13, color: "#8888aa", fontFamily: "Courier" });
         
         let bg = this.add.rectangle(x, y, w, h, isAtivo ? 0x1f2233 : 0x0a0c14).setOrigin(0, 0.5)
             .setStrokeStyle(1.5, isAtivo ? 0xff9900 : 0x444455).setInteractive({ useHandCursor: true });
@@ -188,7 +214,8 @@ export class Salas extends Scene {
         let txt = this.add.text(x + 15, y, displayValor, { fontSize: 16, color: isAtivo ? "#ff9900" : "#ffffff", fontFamily: "Courier", fontStyle: "bold" }).setOrigin(0, 0.5);
 
         bg.on('pointerdown', (p, lx, ly, ev) => { ev.stopPropagation(); this.campoEditando = campoId; this.atualizarInterfaceAtual(); });
-        this.painelContainer.add([bg, txt]);
+        
+        this.painelContainer.add([lbl, bg, txt]);
     }
 
     // ==========================================
@@ -203,7 +230,6 @@ export class Salas extends Scene {
         const sh = this.scale.height;
         this.mapOverlayContainer = this.add.container(0, 0).setDepth(2000);
 
-        // Fundo Escurecido
         let bg = this.add.rectangle(0, 0, sw, sh, 0x000000, 0.90).setOrigin(0).setInteractive();
         this.mapOverlayContainer.add(bg);
 
@@ -218,7 +244,6 @@ export class Salas extends Scene {
             let imgKey = 'preview_mapa' + i;
             let mapExists = this.textures.exists(imgKey);
             
-            // Só mostra mapas até o limite dos que existem fisicamente carregados, garantindo ao menos até o 5 se os arquivos faltarem
             if (!mapExists && i > 5) continue; 
 
             let px = gridX + (col * 170);
@@ -233,7 +258,7 @@ export class Salas extends Scene {
                 imgMap.setScale(scale);
                 this.mapOverlayContainer.add(imgMap);
             } else {
-                let noSignal = this.add.text(px, py - 12, "NO SIGNAL", {fontSize: 12, color: "#ff4444", fontFamily: "Courier"}).setOrigin(0.5);
+                let noSignal = this.add.text(px, py - 12, "SEM SINAL", {fontSize: 12, color: "#ff4444", fontFamily: "Courier"}).setOrigin(0.5);
                 this.mapOverlayContainer.add(noSignal);
             }
 
@@ -267,30 +292,34 @@ export class Salas extends Scene {
     }
 
     // ==========================================
-    // 1. INTERFACE DE CRIAÇÃO (COM ESPAÇOS CORRIGIDOS E CROP)
+    // 1. INTERFACE DE CRIAÇÃO
     // ==========================================
     construirInterfaceCriacao() {
         this.tituloTexto.setText(this.configSala.isSingleplayer ? "// SETUP: SINGLEPLAYER" : "// SETUP: CRIAR SESSÃO MULTIPLAYER");
 
         const xEsq = 50;
-        const xDir = 430;
-        let yEsq = 135; 
-        const gapY = 95; // AUMENTADO BASTANTE PARA NÃO ENCAVALAR O TEXTO
+        const xDir = 380; 
+        let yEsq = 125; 
+        const gapY = 75; 
 
         // ---- COLUNA ESQUERDA ----
-        this.criarCampoTexto(xEsq, yEsq, 300, 38, "NICKNAME DO OPERADOR", this.configSala.hostNick, 'nick');
+        this.criarCampoTexto(xEsq, yEsq, 280, 38, "NICKNAME DO OPERADOR", this.configSala.hostNick, 'nick');
 
         if (!this.configSala.isSingleplayer) {
             yEsq += gapY;
-            this.add.text(xEsq, yEsq - 22, "VISIBILIDADE DA SESSÃO", { fontSize: 13, color: "#8888aa", fontFamily: "Courier" });
-            this.criarBotaoEstilizado(xEsq, yEsq, 300, 38, this.configSala.isPrivate ? "PRIVADA (CÓDIGO)" : "PÚBLICA (BROWSER)", () => {
+            let lblVis = this.add.text(xEsq, yEsq - 22, "VISIBILIDADE DA SESSÃO", { fontSize: 13, color: "#8888aa", fontFamily: "Courier" });
+            this.painelContainer.add(lblVis);
+            
+            this.criarBotaoEstilizado(xEsq, yEsq, 280, 38, this.configSala.isPrivate ? "PRIVADA (CÓDIGO)" : "PÚBLICA (BROWSER)", () => {
                 this.configSala.isPrivate = !this.configSala.isPrivate; this.atualizarInterfaceAtual(); this.tocarSomCurto();
             });
         }
 
         yEsq += gapY;
-        this.add.text(xEsq, yEsq - 22, "MODO DE JOGO", { fontSize: 13, color: "#8888aa", fontFamily: "Courier" });
-        this.criarBotaoEstilizado(xEsq, yEsq, 300, 38, this.configSala.modo, () => {
+        let lblModo = this.add.text(xEsq, yEsq - 22, "MODO DE JOGO", { fontSize: 13, color: "#8888aa", fontFamily: "Courier" });
+        this.painelContainer.add(lblModo);
+
+        this.criarBotaoEstilizado(xEsq, yEsq, 280, 38, this.configSala.modo, () => {
             const modos = ['HISTORIA', 'ESPECIFICO', 'HORARIO'];
             this.configSala.modo = modos[(modos.indexOf(this.configSala.modo) + 1) % modos.length];
             this.atualizarInterfaceAtual(); this.tocarSomCurto();
@@ -298,30 +327,34 @@ export class Salas extends Scene {
 
         yEsq += gapY;
         if (this.configSala.modo === 'ESPECIFICO') {
-            // ESPAÇAMENTO EXCLUSIVO PARA O BOTÃO MAPA NÃO BATER NO TEXTO
-            this.add.text(xEsq + 20, yEsq - 25, "↳ SELECIONAR MAPA", { fontSize: 12, color: "#ff9900", fontFamily: "Courier" });
-            this.criarBotaoEstilizado(xEsq + 20, yEsq + 15, 280, 32, "MAPA " + this.configSala.mapaId, () => {
+            let lblMapa = this.add.text(xEsq + 20, yEsq - 25, "↳ SELECIONAR MAPA", { fontSize: 12, color: "#ff9900", fontFamily: "Courier" });
+            this.painelContainer.add(lblMapa);
+
+            this.criarBotaoEstilizado(xEsq + 20, yEsq + 10, 260, 32, "MAPA " + this.configSala.mapaId, () => {
                 this.abrirOverlayMapas(); 
             }, 0x221100, 0xff9900);
         } else if (this.configSala.modo === 'HORARIO') {
-            this.add.text(xEsq + 20, yEsq - 25, "↳ TIPO DE MAPA", { fontSize: 12, color: "#ff9900", fontFamily: "Courier" });
-            this.criarBotaoEstilizado(xEsq + 20, yEsq + 15, 280, 32, this.configSala.horarioTipo, () => {
+            let lblMapa = this.add.text(xEsq + 20, yEsq - 25, "↳ TIPO DE MAPA", { fontSize: 12, color: "#ff9900", fontFamily: "Courier" });
+            this.painelContainer.add(lblMapa);
+
+            this.criarBotaoEstilizado(xEsq + 20, yEsq + 10, 260, 32, this.configSala.horarioTipo, () => {
                 this.configSala.horarioTipo = this.configSala.horarioTipo === 'PLATAFORMAS' ? 'LABIRINTO' : 'PLATAFORMAS'; this.atualizarInterfaceAtual(); this.tocarSomCurto();
             }, 0x221100, 0xff9900);
         }
 
         // ---- COLUNA DIREITA (Personagens) ----
-        let yDir = 135;
-        let boxSize = 110;
+        let yDir = 125;
+        let boxSize = 90; 
         
-        this.add.text(xDir, yDir - 22, "SELECIONE O OPERADOR", { fontSize: 13, color: "#8888aa", fontFamily: "Courier" });
+        let lblOp = this.add.text(xDir, yDir - 22, "SELECIONE O OPERADOR", { fontSize: 13, color: "#8888aa", fontFamily: "Courier" });
+        this.painelContainer.add(lblOp);
         
         // --- CAIXA DO SOLAR ---
         let isSolar = this.configSala.hostPersonagem === 'solar';
         let bgSolar = this.add.rectangle(xDir, yDir, boxSize, boxSize, isSolar ? 0xff6600 : 0x111118, isSolar ? 0.2 : 1)
             .setOrigin(0, 0).setStrokeStyle(2, isSolar ? 0xff9900 : 0x444455).setInteractive({ useHandCursor: true });
         
-        let txtSolar = this.add.text(xDir + boxSize/2, yDir + boxSize - 15, "SOLAR", { fontSize: 14, color: isSolar ? "#ff9900" : "#666677", fontFamily: "Courier", fontStyle: "bold" }).setOrigin(0.5);
+        let txtSolar = this.add.text(xDir + boxSize/2, yDir + boxSize - 12, "SOLAR", { fontSize: 13, color: isSolar ? "#ff9900" : "#666677", fontFamily: "Courier", fontStyle: "bold" }).setOrigin(0.5);
         this.painelContainer.add([bgSolar, txtSolar]);
         bgSolar.on('pointerdown', (p, lx, ly, ev) => { ev.stopPropagation(); this.configSala.hostPersonagem = 'solar'; this.atualizarInterfaceAtual(); this.tocarSomCurto(); });
 
@@ -330,33 +363,37 @@ export class Salas extends Scene {
         let bgForn = this.add.rectangle(xDir + boxSize + 20, yDir, boxSize, boxSize, isForn ? 0xff6600 : 0x111118, isForn ? 0.2 : 1)
             .setOrigin(0, 0).setStrokeStyle(2, isForn ? 0xff9900 : 0x444455).setInteractive({ useHandCursor: true });
         
-        let txtForn = this.add.text(xDir + boxSize + 20 + boxSize/2, yDir + boxSize - 15, "FORNALHA", { fontSize: 14, color: isForn ? "#ff9900" : "#666677", fontFamily: "Courier", fontStyle: "bold" }).setOrigin(0.5);
+        let txtForn = this.add.text(xDir + boxSize + 20 + boxSize/2, yDir + boxSize - 12, "FORNALHA", { fontSize: 13, color: isForn ? "#ff9900" : "#666677", fontFamily: "Courier", fontStyle: "bold" }).setOrigin(0.5);
         this.painelContainer.add([bgForn, txtForn]);
         bgForn.on('pointerdown', (p, lx, ly, ev) => { ev.stopPropagation(); this.configSala.hostPersonagem = 'fornalha'; this.atualizarInterfaceAtual(); this.tocarSomCurto(); });
 
-        // --- PERSONAGENS COM CROP ISOLADO CORRETO ---
+        // --- SPRITES DOS PERSONAGENS ---
         if (this.textures.exists('Personagens')) {
             let tex = this.textures.get('Personagens');
-            let img = tex.getSourceImage();
-            let halfW = Math.floor(img.width / 2);
-            let h = img.height;
+            
+            // GARANTIR QUE OS FRAMES DE RECORTES EXISTEM AQUI
+            if (!tex.has('preview_solar_frame') || !tex.has('preview_fornalha_frame')) {
+                let img = tex.getSourceImage();
+                let halfW = Math.floor(img.width / 2);
+                let h = img.height;
+                if (!tex.has('preview_solar_frame')) tex.add('preview_solar_frame', 0, 0, 0, halfW, h);
+                if (!tex.has('preview_fornalha_frame')) tex.add('preview_fornalha_frame', 0, halfW, 0, halfW, h);
+            }
 
-            if (!tex.has('preview_solar_frame')) tex.add('preview_solar_frame', 0, 0, 0, halfW, h);
-            if (!tex.has('preview_fornalha_frame')) tex.add('preview_fornalha_frame', 0, halfW, 0, halfW, h);
-
-            let spriteSolar = this.add.image(xDir + boxSize/2, yDir + boxSize/2 - 10, 'Personagens', 'preview_solar_frame').setOrigin(0.5).setScale(3);
+            let spriteSolar = this.add.image(xDir + boxSize/2, yDir + boxSize/2 - 10, 'Personagens', 'preview_solar_frame').setOrigin(0.5).setScale(2.5);
             this.painelContainer.add(spriteSolar);
 
-            let spriteFornalha = this.add.image(xDir + boxSize + 20 + boxSize/2, yDir + boxSize/2 - 10, 'Personagens', 'preview_fornalha_frame').setOrigin(0.5).setScale(3);
+            let spriteFornalha = this.add.image(xDir + boxSize + 20 + boxSize/2, yDir + boxSize/2 - 10, 'Personagens', 'preview_fornalha_frame').setOrigin(0.5).setScale(2.5);
             this.painelContainer.add(spriteFornalha);
         }
 
         // --- PREVIEW DO MAPA ---
         if (this.configSala.modo === 'ESPECIFICO') {
-            let yMap = yDir + boxSize + 30; 
-            this.add.text(xDir, yMap - 20, "PREVIEW DO TERRENO", { fontSize: 13, color: "#8888aa", fontFamily: "Courier" });
+            let yMap = yDir + boxSize + 25; 
+            let lblPrev = this.add.text(xDir, yMap - 20, "PREVIEW DO TERRENO", { fontSize: 13, color: "#8888aa", fontFamily: "Courier" });
+            this.painelContainer.add(lblPrev);
             
-            let pW = 320; let pH = 150;
+            let pW = 320; let pH = 135; 
             let bgMap = this.add.rectangle(xDir, yMap, pW, pH, 0x050608).setOrigin(0, 0).setStrokeStyle(1, 0x00f3ff, 0.5);
             this.painelContainer.add(bgMap);
 
@@ -367,12 +404,12 @@ export class Salas extends Scene {
                 imgMap.setScale(scale);
                 this.painelContainer.add(imgMap);
             } else {
-                this.painelContainer.add(this.add.text(xDir + pW/2, yMap + pH/2, "SINAL DE VÍDEO\nNÃO ENCONTRADO\n("+imgKey+")", { fontSize: 13, color: "#ff4444", fontFamily: "Courier", align: "center" }).setOrigin(0.5));
+                this.painelContainer.add(this.add.text(xDir + pW/2, yMap + pH/2, "SINAL DE VÍDEO\nNÃO ENCONTRADO", { fontSize: 13, color: "#ff4444", fontFamily: "Courier", align: "center" }).setOrigin(0.5));
             }
         }
 
         // ---- BOTÕES INFERIORES FIXADOS NO RODAPÉ ----
-        let yBotao = this.scale.height - 25; 
+        let yBotao = this.scale.height - 30; 
 
         this.criarBotaoEstilizado(this.scale.width - 250, yBotao, 210, 40, "[ INICIALIZAR ]", () => {
             this.tocarSomCurto(); this.socket.emit('criarSala', this.configSala);
@@ -413,7 +450,7 @@ export class Salas extends Scene {
         });
 
         this.criarBotaoEstilizado(this.scale.width - 250, 135, 210, 40, "[ ATUALIZAR RADAR ]", () => { this.tocarSomCurto(); this.socket.emit('solicitarSalasPublicas'); });
-        this.criarBotaoEstilizado(50, this.scale.height - 25, 120, 40, "VOLTAR", () => { this.tocarSomCurto(); this.voltarProMenu(); }, 0x330000, 0xff4444, "#ff4444");
+        this.criarBotaoEstilizado(50, this.scale.height - 30, 120, 40, "VOLTAR", () => { this.tocarSomCurto(); this.voltarProMenu(); }, 0x330000, 0xff4444, "#ff4444");
     }
 
     construirInterfaceCodigo() {
@@ -428,47 +465,63 @@ export class Salas extends Scene {
             }
         }, 0x004422, 0x00ff66, "#00ff66");
 
-        this.criarBotaoEstilizado(50, this.scale.height - 25, 120, 40, "VOLTAR", () => { this.tocarSomCurto(); this.voltarProMenu(); }, 0x330000, 0xff4444, "#ff4444");
+        this.criarBotaoEstilizado(50, this.scale.height - 30, 120, 40, "VOLTAR", () => { this.tocarSomCurto(); this.voltarProMenu(); }, 0x330000, 0xff4444, "#ff4444");
     }
 
     construirInterfaceLobby() {
         const isHost = this.salaAtual.hostId === this.socket.id;
         this.tituloTexto.setText(`// LOBBY ${this.salaAtual.isSingleplayer ? "OFFLINE" : "MULTIPLAYER"} - SESSÃO: [ ${this.salaAtual.id} ]`);
 
-        let yP1 = 140; let yP2 = 250;
+        let yP1 = 130; 
+        let yP2 = 230;
 
         Object.entries(this.salaAtual.jogadores).forEach(([id, dados], index) => {
             let yPos = index === 0 ? yP1 : yP2;
             let status = isHost && id === this.socket.id ? " (HOST)" : "";
             
-            let bgPlayer = this.add.rectangle(50, yPos, 400, 90, 0x141624).setOrigin(0, 0).setStrokeStyle(1.5, 0x00f3ff);
+            let bgPlayer = this.add.rectangle(50, yPos, 400, 80, 0x141624).setOrigin(0, 0).setStrokeStyle(1.5, 0x00f3ff);
             let txtInfos = `OPERADOR: ${dados.personagem.toUpperCase()}\nNICK: ${dados.nick}${status}`;
-            let txtNode = this.add.text(140, yPos + 45, txtInfos, { fontFamily: "Courier", color: "#fff", fontSize: 16, fontStyle: "bold" }).setOrigin(0, 0.5);
+            let txtNode = this.add.text(140, yPos + 40, txtInfos, { fontFamily: "Courier", color: "#fff", fontSize: 16, fontStyle: "bold" }).setOrigin(0, 0.5);
             
             this.painelContainer.add([bgPlayer, txtNode]);
 
             if (this.textures.exists('Personagens')) {
                 let tex = this.textures.get('Personagens');
+                
+                // CORREÇÃO: GARANTIR QUE OS FRAMES EXISTEM TAMBÉM NA TELA DO CONVIDADO
+                if (!tex.has('preview_solar_frame') || !tex.has('preview_fornalha_frame')) {
+                    let img = tex.getSourceImage();
+                    let halfW = Math.floor(img.width / 2);
+                    let h = img.height;
+                    if (!tex.has('preview_solar_frame')) tex.add('preview_solar_frame', 0, 0, 0, halfW, h);
+                    if (!tex.has('preview_fornalha_frame')) tex.add('preview_fornalha_frame', 0, halfW, 0, halfW, h);
+                }
+
                 let isSolar = dados.personagem === 'solar';
                 let frameKey = isSolar ? 'preview_solar_frame' : 'preview_fornalha_frame';
 
                 if(tex.has(frameKey)) {
-                    let pSprite = this.add.image(95, yPos + 45, 'Personagens', frameKey).setOrigin(0.5).setScale(3);
+                    let pSprite = this.add.image(95, yPos + 40, 'Personagens', frameKey).setOrigin(0.5).setScale(2.5);
                     this.painelContainer.add(pSprite);
                 }
             }
         });
 
         if (Object.keys(this.salaAtual.jogadores).length < 2 && !this.salaAtual.isSingleplayer) {
-            this.painelContainer.add(this.add.text(50, yP2 + 45, "Aguardando conexão de segundo operador...", {color: "#8888aa", fontFamily: "Courier", fontStyle: "italic"}).setOrigin(0, 0.5));
+            let lblAguardando = this.add.text(50, yP2 + 40, "Aguardando conexão de segundo operador...", {color: "#8888aa", fontFamily: "Courier", fontStyle: "italic"}).setOrigin(0, 0.5);
+            this.painelContainer.add(lblAguardando);
         }
 
-        let yBotao = this.scale.height - 25;
+        // ---- CONTROLES DE LOBBY ----
+        let yBotao = this.scale.height - 30;
+        
         if (isHost) {
             if (this.salaAtual.isSingleplayer || Object.keys(this.salaAtual.jogadores).length === 2) {
-                this.criarBotaoEstilizado(this.scale.width - 250, yBotao, 210, 40, "[ START SEQUENCE ]", () => { this.tocarSomCurto(); this.socket.emit('iniciarPartida'); }, 0x004422, 0x00ff66, "#00ff66");
+                this.criarBotaoEstilizado(this.scale.width - 250, yBotao, 210, 40, "[ INICIAR SEQUENCIA ]", () => { this.tocarSomCurto(); this.socket.emit('iniciarPartida'); }, 0x004422, 0x00ff66, "#00ff66");
             } else {
-                this.add.text(this.scale.width - 250, yBotao, "[ START LOCKED ]", {color: "#555566", fontFamily: "Courier", fontStyle: "bold"}).setOrigin(0.5);
+                let btnLckBg = this.add.rectangle(this.scale.width - 250, yBotao, 210, 40, 0x1a1a24).setOrigin(0, 0.5).setStrokeStyle(1.5, 0x555566);
+                let btnLckTxt = this.add.text(this.scale.width - 250 + 105, yBotao, "[ ESPERANDO JOGADOR ]", {color: "#555566", fontFamily: "Courier", fontStyle: "bold"}).setOrigin(0.5);
+                this.painelContainer.add([btnLckBg, btnLckTxt]);
             }
         }
 

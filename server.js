@@ -75,19 +75,19 @@ io.on('connection', (socket) => {
         const sala = salas[salaId];
 
         if (!sala) {
-            socket.emit('erroLobby', 'Sala não encontrada.');
+            socket.emit('erroLobby', 'A sessão não foi encontrada ou não existe mais.');
             return;
         }
         if (sala.estado !== 'LOBBY') {
-            socket.emit('erroLobby', 'Partida já em andamento.');
+            socket.emit('erroLobby', 'Acesso negado: Partida já está em andamento.');
             return;
         }
         if (Object.keys(sala.jogadores).length >= 2) {
-            socket.emit('erroLobby', 'A sala está cheia (Máx 2 jogadores).');
+            socket.emit('erroLobby', 'Acesso negado: A sala está cheia (Máx. 2 Operadores).');
             return;
         }
 
-        // Descobre qual personagem sobrou
+        // Descobre qual personagem sobrou e aloca automaticamente o visitante
         const hostCor = sala.jogadores[sala.hostId].personagem;
         const personagemDisponivel = hostCor === 'solar' ? 'fornalha' : 'solar';
 
@@ -96,14 +96,23 @@ io.on('connection', (socket) => {
         socket.join(salaId);
         socket.salaAtual = salaId;
 
-        // Atualiza todos na sala
+        // Atualiza a tela de Lobby para todos que estão nela (Host e Convidado)
         io.to(salaId).emit('atualizacaoLobby', sala);
+        
+        // Atualiza o Browser público
         io.emit('listaSalasAtualizada', obterSalasPublicas());
     });
 
     socket.on('iniciarPartida', () => {
         const salaId = socket.salaAtual;
         if (salaId && salas[salaId] && salas[salaId].hostId === socket.id) {
+            
+            // Trava de segurança no Back-end garantindo 2 jogadores
+            if (!salas[salaId].isSingleplayer && Object.keys(salas[salaId].jogadores).length < 2) {
+                socket.emit('erroLobby', 'Não é possível iniciar a partida sem um segundo operador.');
+                return;
+            }
+
             salas[salaId].estado = 'JOGANDO';
             io.to(salaId).emit('partidaIniciada', salas[salaId]);
             io.emit('listaSalasAtualizada', obterSalasPublicas());
@@ -115,7 +124,7 @@ io.on('connection', (socket) => {
     });
 
     // ==========================================
-    // IN-GAME NETWORK (Agora isolado por sala)
+    // IN-GAME NETWORK
     // ==========================================
 
     socket.on('enviarPosicao', (data) => {
@@ -124,7 +133,6 @@ io.on('connection', (socket) => {
 
         const jogador = salas[salaId].jogadores[socket.id];
         if (jogador) {
-            // Inclui o 'pronto' que faltava, vindo do pull anterior
             salas[salaId].posicoes[jogador.personagem] = { 
                 x: data.x, 
                 y: data.y, 
@@ -136,7 +144,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('faseConcluida', (dados) => {
-        // Envia apenas para o outro jogador da mesma sala, imitando o broadcast
         if (socket.salaAtual) {
             socket.to(socket.salaAtual).emit('irParaTransicao', dados);
         }
@@ -173,14 +180,14 @@ function removerJogadorDaSala(socket) {
     socket.salaAtual = null;
 
     if (Object.keys(sala.jogadores).length === 0) {
-        delete salas[salaId]; // Destrói a sala vazia
+        delete salas[salaId]; // Destrói a sala vazia se todos saírem
     } else {
-        // Se o host saiu, o outro vira host (caso aplique)
+        // Se o host original saiu, o convidado assume como host
         if (sala.hostId === socket.id) {
             sala.hostId = Object.keys(sala.jogadores)[0];
         }
         io.to(salaId).emit('atualizacaoLobby', sala);
-        io.to(salaId).emit('erroLobby', 'O outro jogador se desconectou.');
+        io.to(salaId).emit('erroLobby', 'O outro operador se desconectou da rede.');
     }
     io.emit('listaSalasAtualizada', obterSalasPublicas());
 }
@@ -196,7 +203,6 @@ function getLocalIP() {
 }
 
 const PORT = 3000;
-// Substitui '0.0.0.0' por '::' para aceitar conexões IPv4 e IPv6
 server.listen(PORT, '::', () => {
     const ip = getLocalIP();
     console.log(`\n==================================================`);
