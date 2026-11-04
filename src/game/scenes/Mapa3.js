@@ -789,7 +789,7 @@ let indoEsquerda = this.cursors.left.isDown || this.apertouA.isDown;
         this.pararSonsMovimento();
         const quemMarcouPonto = this.personagemInicial; 
         const dadosTransicao = {
-            proximaCena: 'Creditos',
+            proximaCena: 'Mapa2',
             personagem: this.personagemInicial,
             pontosSolar: this.pontosSolar,
             pontosFornalha: this.pontosFornalha,
@@ -816,7 +816,7 @@ let indoEsquerda = this.cursors.left.isDown || this.apertouA.isDown;
         this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
             if (this.scene.isActive('Mapa3')) {
                 this.scene.stop('Mapa3');
-                this.scene.start('Creditos', { personagem: this.personagemInicial });
+                this.scene.start('Mapa2', { personagem: this.personagemInicial });
             }
         });
     }

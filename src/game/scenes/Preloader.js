@@ -89,6 +89,7 @@ export class Preloader extends Scene {
     this.load.tilemapTiledJSON('mapa1', 'assets/maps/_mapasdojogo/Mapa4.json');
     this.load.tilemapTiledJSON('mapa2', 'assets/maps/_mapasdojogo/Mapa2.json');
     this.load.tilemapTiledJSON('mapa3', 'assets/maps/_mapasdojogo/Mapa3.json');
+    this.load.tilemapTiledJSON('mapa4', 'assets/maps/_mapasdojogo/Mapa5.json');
 
     this.load.image('FundoMetal', 'assets/sprites/background-images/FundoMetal.png');
     this.load.image('Personagens', 'assets/sprites/characters/Personagens.png');
@@ -135,6 +136,7 @@ export class Preloader extends Scene {
     this.load.image('preview_mapa1', 'assets/maps/_mapasdojogo/Imagens/preview_mapa1.png');
     this.load.image('preview_mapa2', 'assets/maps/_mapasdojogo/Imagens/preview_mapa2.png');
     this.load.image('preview_mapa3', 'assets/maps/_mapasdojogo/Imagens/preview_mapa3.png');
+    this.load.image('preview_mapa4', 'assets/maps/_mapasdojogo/Imagens/preview_mapa4.png');
   }
 
   create() {
