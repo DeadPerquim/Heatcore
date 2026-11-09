@@ -37,7 +37,7 @@ export class Mapa4 extends Scene {
             });
         }
 
-        const map = this.make.tilemap({ key: 'mapa4' });
+        const map = this.make.tilemap({ key: 'mapa2' });
 
         const tsFundo = map.addTilesetImage('FundoMetal', 'FundoMetal');
         const tsPersonagens = map.addTilesetImage('Personagens', 'Personagens');
@@ -45,7 +45,7 @@ export class Mapa4 extends Scene {
         const tsPedras = map.addTilesetImage('TilesPedra', 'TilesPedra');
         const tsEspinhos = map.addTilesetImage('Espinhos', 'Espinhos');
 
-        const arrayTilesets = [tsFundo, tsPersonagens, tsTexturas, tsPedras, tsEspinhos].filter(ts => ts !== null);
+        const arrayTilesets = [tsFundo, tsPersonagens, tsTexturas, tsPedras, tsEspinhos];
 
         const layerPedras = map.createLayer('Pedras', arrayTilesets, 0, 0);
         const layerCenarioDeFundo = map.createLayer('CenarioDeFundo', arrayTilesets, 0, 0);
@@ -58,8 +58,8 @@ export class Mapa4 extends Scene {
         }
 
         this.mapaAlturaTotal = map.heightInPixels;
-        if (layerLimites) layerLimites.setCollisionByExclusion([-1]);
-        if (layerObjetos) layerObjetos.setCollisionByExclusion([-1]);
+        layerLimites.setCollisionByExclusion([-1]);
+        layerObjetos.setCollisionByExclusion([-1]);
         
         this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.physics.world.setBoundsCollision(true, true, true, false);
@@ -81,13 +81,7 @@ export class Mapa4 extends Scene {
         this.escuroAtivo = false;
         this.escuridaoSprite = this.add.image(0, 0, 'escuridaoComFuro').setDepth(150).setVisible(false);
 
-        // ==========================================
-        // 1. SPAWNS E PORTAIS (CRUZAMENTO DE MAPA)
-        // ==========================================
-        const posicoesSpawn = { 
-            solar: { x: 250, y: 1100 },      // Esquerda
-            fornalha: { x: 900, y: 1100 }    // Direita
-        };
+        const posicoesSpawn = { solar: { x: 247.5, y: 370 }, fornalha: { x: 1100, y: 370 } };
 
         const coordLocal = posicoesSpawn[this.personagemInicial];
         const chaveLocal = this.personagemInicial === 'solar' ? 'solar_andando' : 'fornalha_andando';
@@ -102,58 +96,14 @@ export class Mapa4 extends Scene {
         const coordOutro = posicoesSpawn[this.outroPersonagemTipo];
         const chaveSpriteOutro = this.outroPersonagemTipo === 'solar' ? 'solar_andando' : 'fornalha_andando';
 
-        this.outroSprite = this.physics.add.sprite(coordOutro.x, coordOutro.y, chaveSpriteOutro).setAlpha(0.9).setDepth(50);
+        this.outroSprite = this.add.sprite(coordOutro.x, coordOutro.y, chaveSpriteOutro).setAlpha(0.9).setDepth(50);
         this.outroSprite.setVisible(false);
-        this.outroSprite.body.setAllowGravity(false); 
 
-        // ==========================================
-        // 2. SISTEMA DA CAIXA DE EMPURRAR
-        // ==========================================
-        let caixaX = 1250; 
-        let caixaY = 1100;
-        let achouCaixa = false;
-        
-        if (layerForeground) {
-            layerForeground.forEachTile(tile => {
-                if (tile.index !== -1) {
-                    if (!achouCaixa) {
-                        caixaX = tile.getCenterX();
-                        caixaY = tile.getCenterY();
-                        achouCaixa = true; // Garante que só pega a posição do primeiro tile
-                    }
-                    // Remove TODOS os tiles pintados para evitar colisão fantasma
-                    layerForeground.removeTileAt(tile.x, tile.y);
-                }
-            });
-        }
-
-        // Cria a caixa com física
-        this.caixa = this.physics.add.sprite(caixaX, caixaY, 'TilesPedra');
-        
-        // CORREÇÃO: Força o visual e a física para 16x16 exatos.
-        this.caixa.setDisplaySize(16, 16); 
-        this.caixa.setSize(16, 16); 
-        
-        this.caixa.setCollideWorldBounds(true);
-        this.caixa.setBounce(0);
-        this.caixa.setDragX(800); 
-        this.caixa.setMass(2.5); 
-
-        // Colisões da caixa
-        if (layerLimites) this.physics.add.collider(this.caixa, layerLimites);
-        if (layerObjetos) this.physics.add.collider(this.caixa, layerObjetos);
-        this.physics.add.collider(this.jogadorAtual, this.caixa);
-        this.physics.add.collider(this.outroSprite, this.caixa);
-
-        // ==========================================
-        // 3. RECEBIMENTO DE DADOS (SYNC MULTIPLAYER)
-        // ==========================================
         if (this.socket) {
             this.socket.off('atualizarPosicoes');
             this.socket.on('atualizarPosicoes', (posicoes) => {
                 if (!posicoes) return;
                 const dadosOutro = posicoes[this.outroPersonagemTipo];
-                
                 if (dadosOutro && this.outroSprite) {
                     if ((dadosOutro.x === 0 && dadosOutro.y === 0) || (dadosOutro.cena && dadosOutro.cena !== this.scene.key)) {
                         this.outroSprite.setVisible(false);
@@ -161,20 +111,8 @@ export class Mapa4 extends Scene {
                         this.outroSprite.x = dadosOutro.x;
                         this.outroSprite.y = dadosOutro.y;
                         this.outroSprite.setVisible(true);
-
-                        // SYNC DA CAIXA
-                        if (dadosOutro.caixa && this.caixa) {
-                            const distMinha = Phaser.Math.Distance.Between(this.jogadorAtual.x, this.jogadorAtual.y, this.caixa.x, this.caixa.y);
-                            const distOutro = Phaser.Math.Distance.Between(dadosOutro.x, dadosOutro.y, this.caixa.x, this.caixa.y);
-                            
-                            if (distOutro < distMinha) {
-                                this.caixa.x = Phaser.Math.Linear(this.caixa.x, dadosOutro.caixa.x, 0.5);
-                                this.caixa.y = Phaser.Math.Linear(this.caixa.y, dadosOutro.caixa.y, 0.5);
-                                this.caixa.setVelocity(dadosOutro.caixa.vx, dadosOutro.caixa.vy);
-                            }
-                        }
-
-                        // LÓGICA DE RECEBER CHUTE
+                        
+                        // ====== LÓGICA DE RECEBER CHUTE ======
                         if (dadosOutro.pronto === 'chutou' && !this.levouChute && this.jogadorAtual && !this.jogadorAtual.estaRenascendo) {
                             const dist = Phaser.Math.Distance.Between(this.jogadorAtual.x, this.jogadorAtual.y, this.outroSprite.x, this.outroSprite.y);
                             if (dist < 70 && Math.abs(this.jogadorAtual.y - this.outroSprite.y) < 50) {
@@ -197,23 +135,14 @@ export class Mapa4 extends Scene {
             });
         }
 
-        // ==========================================
-        // 4. PORTAIS DE FIM DE FASE
-        // ==========================================
-        // CORREÇÃO: Usando Zonas (Zones) em vez de Sprites com visibilidade desligada.
-        // Assim, eles não aparecem como caixas rosas inúteis no modo de depuração (debug).
-        const portalFornalha = this.add.zone(100, 1090, 32, 100);
-        this.physics.add.existing(portalFornalha, true);
-        portalFornalha.body.debugShowBody = false; // Oculta do Debug
-        
-        const portalSolar = this.add.zone(950, 1090, 32, 100);
-        this.physics.add.existing(portalSolar, true);
-        portalSolar.body.debugShowBody = false; // Oculta do Debug
+        this.teleporters = this.physics.add.staticGroup();
+        const teleporter1 = this.teleporters.create(210, 370, 'corredorEsquerdo').setVisible(false);
+        const teleporter2 = this.teleporters.create(1150, 370, 'corredorDireito').setVisible(false);
 
-        if (layerLimites) this.physics.add.collider(this.jogadorAtual, layerLimites);
-        if (layerObjetos) this.physics.add.collider(this.jogadorAtual, layerObjetos);
+        this.physics.add.collider(this.jogadorAtual, layerLimites);
+        this.physics.add.collider(this.jogadorAtual, layerObjetos);
 
-        const teleporterAlvo = this.personagemInicial === 'solar' ? portalSolar : portalFornalha;
+        const teleporterAlvo = this.personagemInicial === 'solar' ? teleporter2 : teleporter1;
         this.physics.add.overlap(this.jogadorAtual, teleporterAlvo, this.completouFase, null, this);
 
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
@@ -245,14 +174,14 @@ export class Mapa4 extends Scene {
         this.somPulando = this.sound.add('sfx_pulando', { volume: 0.4 * volSFX });
 
         if (this.mostrarTutorialInicial) {
-            this.jogadoresProntos = false; 
+            this.jogadoresProntos = false; // Bloqueia o player até ele fechar a tela
             this.criarOverlayControles();
         } else {
-            this.jogadoresProntos = true; 
+            this.jogadoresProntos = true; // Libera o player imediatamente se não houver overlay
         }
     }
 
-    criarOverlayControles() {
+criarOverlayControles() {
         const sw = this.scale.width;
         const sh = this.scale.height;
 
@@ -298,6 +227,9 @@ export class Mapa4 extends Scene {
         graficosBotoes.lineStyle(1, 0x00f3ff, 0.3);
         graficosBotoes.lineBetween(sw/2, sh*0.25, sw/2, sh*0.80);
 
+        // ===================================
+        // DESENHO DO TECLADO
+        // ===================================
         const kx = sw * 0.25;
         const ky = sh * 0.50;
 
@@ -333,6 +265,9 @@ export class Mapa4 extends Scene {
         drawKey(kx + 30, ky - 40, 50, 50, "E", "BATER", true); 
         drawKey(kx - 160, ky + 100, 70, 40, "CTRL", "BATER", true); 
 
+        // ===================================
+        // DESENHO DO GAMEPAD
+        // ===================================
         const cx = sw * 0.75;
         const cy = sh * 0.50;
 
@@ -340,11 +275,12 @@ export class Mapa4 extends Scene {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 20, color: "#ffffff", fontStyle: "bold" 
         }).setOrigin(0.5));
 
+        // Botões L e R (Movidos mais para cima para não esmagar o botão X)
         const bumperY = cy - 80;
 
         graficosBotoes.lineStyle(2, 0x00f3ff, 0.8);
         graficosBotoes.fillStyle(0x001a33, 0.8);
-        graficosBotoes.fillRoundedRect(cx - 100, bumperY, 50, 18, 5); 
+        graficosBotoes.fillRoundedRect(cx - 100, bumperY, 50, 18, 5); // L
         graficosBotoes.strokeRoundedRect(cx - 100, bumperY, 50, 18, 5);
         this.containerBotoes.add(this.add.text(cx - 75, bumperY + 9, "L", { 
             fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: "#00f3ff", fontStyle: "bold" 
@@ -352,16 +288,18 @@ export class Mapa4 extends Scene {
 
         graficosBotoes.lineStyle(2, 0xff9900, 0.8);
         graficosBotoes.fillStyle(0x331a00, 0.8);
-        graficosBotoes.fillRoundedRect(cx + 50, bumperY, 50, 18, 5); 
+        graficosBotoes.fillRoundedRect(cx + 50, bumperY, 50, 18, 5); // R
         graficosBotoes.strokeRoundedRect(cx + 50, bumperY, 50, 18, 5);
         this.containerBotoes.add(this.add.text(cx + 75, bumperY + 9, "R", { 
             fontFamily: "'Courier New', Courier, monospace", fontSize: 14, color: "#ff9900", fontStyle: "bold" 
         }).setOrigin(0.5));
         
+        // TEXTO "CORRER" perfeitamente posicionado acima do botão R
         this.containerBotoes.add(this.add.text(cx + 75, bumperY - 12, "CORRER", { 
             fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
         }).setOrigin(0.5));
 
+        // Base do Gamepad
         graficosBotoes.lineStyle(2, 0x00f3ff, 0.5);
         graficosBotoes.fillStyle(0x001a33, 0.3);
         graficosBotoes.fillRoundedRect(cx - 130, cy - 40, 260, 110, 35);
@@ -385,6 +323,7 @@ export class Mapa4 extends Scene {
             fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#aaaaaa" 
         }).setOrigin(0.5));
 
+        // Função de desenho atualizada para permitir o controle do deslocamento no eixo X e Y (evita overlap)
         const drawBtn = (bx, by, label, isHighlight, desc, descOffX, descOffY) => {
             const cor = isHighlight ? 0xff9900 : 0x00f3ff;
             graficosBotoes.lineStyle(2, cor, 0.8);
@@ -404,6 +343,7 @@ export class Mapa4 extends Scene {
         const bX = cx + 70;
         const bY = cy + 15;
         
+        // BATER colocado ao lado direito (40px) e CORRER ao lado esquerdo (-45px), liberando espaço superior!
         drawBtn(bX, bY - 28, "X", true, "BATER", 40, 0); 
         drawBtn(bX - 28, bY, "Y", true, "CORRER", -45, 0); 
         drawBtn(bX, bY + 28, "B", true, "PULAR", 0, 25);  
@@ -470,7 +410,7 @@ export class Mapa4 extends Scene {
     adicionarFiltroVisao() {
         const sw = this.scale.width;
         const sh = this.scale.height;
-        const uiContainer = this.uiContainer;
+        const uiContainer = this.uiContainer; 
 
         if (this.personagemInicial === 'solar') {
             if (!this.textures.exists('vinheta_solar')) {
@@ -561,7 +501,7 @@ export class Mapa4 extends Scene {
 
     update() {
         if (this.jaEstaSaindo) return;
-
+        
         if (!this.jogadoresProntos && this.mostrarTutorialInicial) {
             const pad = this.input.gamepad ? this.input.gamepad.pad1 : null;
             const padAtivo = pad || (typeof navigator !== 'undefined' && navigator.getGamepads && navigator.getGamepads().filter(p => p).length > 0);
@@ -630,8 +570,7 @@ export class Mapa4 extends Scene {
                 x: activePlayer.x, 
                 y: activePlayer.y,
                 cena: this.scene.key,
-                pronto: this.isKicking ? 'chutou' : false,
-                caixa: this.caixa ? { x: this.caixa.x, y: this.caixa.y, vx: this.caixa.body.velocity.x, vy: this.caixa.body.velocity.y } : null
+                pronto: this.isKicking ? 'chutou' : false
             });
         }
 
@@ -680,6 +619,7 @@ export class Mapa4 extends Scene {
         let tentouPular = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space) || this.apertouW.isDown;
         let estaCorrendo = this.apertouShift.isDown;
         
+        // --- SISTEMA DE CHUTE ---
         let apertouBaterAgora = false;
         if (this.apertouE.isDown || this.apertouCtrl.isDown) apertouBaterAgora = true;
 
@@ -694,6 +634,7 @@ export class Mapa4 extends Scene {
             if (isBtnPressed(pad, 2)) tentouPular = true;
             if (isBtnPressed(pad, 3) || isBtnPressed(pad, 5) || (pad && pad.R2 && pad.R2 > 0.1)) estaCorrendo = true;
 
+            // ⚠️ CORREÇÃO AQUI: Mudado para 'apertouBaterAgora' em vez de 'apertouBater'
             if (isBtnPressed(pad, 0)) apertouBaterAgora = true;
 
             if (isBtnPressed(pad, 8) || isBtnPressed(pad, 9)) {
@@ -709,23 +650,31 @@ export class Mapa4 extends Scene {
         if (apertouBaterAgora && !this.ultimoEstadoBater && !this.isKicking) {
             this.isKicking = true;
             
+            // --- LÓGICA DO EFEITO SONORO "SFX_BATER" ---
+            // Verifica se o outro jogador existe na tela e está visível
             if (this.outroSprite && this.outroSprite.visible) {
+                // Calcula a distância entre você (jogadorAtual) e o outro sprite
                 const dist = Phaser.Math.Distance.Between(
                     this.jogadorAtual.x, this.jogadorAtual.y, 
                     this.outroSprite.x, this.outroSprite.y
                 );
                 
-                if (dist <= 70) {
+                // Você pediu um raio de 5 pixels. 
+                // DICA: Em jogos 2D, 5 pixels significa que os personagens estão praticamente sobrepostos um no outro (o hitbox do seu chute real é de 70 pixels no código). 
+                // Se notar que o som não está saindo quando você bate, recomendo alterar o "5" para "50" ou "70".
+                if (dist <= 5) {
                     const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
                     this.sound.play('sfx_bater', { volume: volSFX });
                 }
             }
+            // ------------------------------------------
 
             setTimeout(() => this.isKicking = false, 400); 
         }
         this.ultimoEstadoBater = apertouBaterAgora;
 
         if (!this.jogadoresProntos) {
+            // ⚠️ CORREÇÃO AQUI: Adicionado 'apertouBaterAgora = false;' para não bater no tutorial
             indoEsquerda = false; indoDireita = false; tentouPular = false; estaCorrendo = false; apertouBaterAgora = false;
             if (padAtivo && this.podeFecharComGamepad) {
                 let apertouGamepad = false;
@@ -840,7 +789,7 @@ export class Mapa4 extends Scene {
         this.pararSonsMovimento();
         const quemMarcouPonto = this.personagemInicial; 
         const dadosTransicao = {
-            proximaCena: 'Mapa3',
+            proximaCena: 'Creditos',
             personagem: this.personagemInicial,
             pontosSolar: this.pontosSolar,
             pontosFornalha: this.pontosFornalha,
@@ -867,7 +816,7 @@ export class Mapa4 extends Scene {
         this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
             if (this.scene.isActive('Mapa4')) {
                 this.scene.stop('Mapa4');
-                this.scene.start('Mapa3', { personagem: this.personagemInicial });
+                this.scene.start('Creditos', { personagem: this.personagemInicial });
             }
         });
     }

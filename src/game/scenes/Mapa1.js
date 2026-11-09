@@ -770,7 +770,7 @@ criarOverlayControles() {
         const quemMarcouPonto = this.personagemInicial; 
 
         const dadosTransicao = {
-            proximaCena: 'Mapa4',
+            proximaCena: 'Mapa2',
             personagem: this.personagemInicial,
             pontosSolar: this.pontosSolar,
             pontosFornalha: this.pontosFornalha,
@@ -797,7 +797,7 @@ criarOverlayControles() {
         this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
             if (this.scene.isActive('Mapa1')) {
                 this.scene.stop('Mapa1');
-                this.scene.start('Mapa4', { personagem: this.personagemInicial });
+                this.scene.start('Mapa2', { personagem: this.personagemInicial });
             }
         });
     }

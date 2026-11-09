@@ -160,7 +160,7 @@ export class MainMenu extends Scene {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
     }).setAlpha(0.5).setDepth(20);
 
-    this.add.text(width - 30, height - 30, "HEATCORE v1.4.0 - SALAS", {
+    this.add.text(width - 30, height - 30, "HEATCORE v1.5.0 - MAPA2", {
       fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#8888aa"
     }).setOrigin(1, 1).setAlpha(0.5).setDepth(20);
 
@@ -206,7 +206,7 @@ export class MainMenu extends Scene {
     this.menus = {
       PRINCIPAL: [
         { text: "JOGAR", action: () => this.trocarMenu("TIPO_JOGO") },
-        { text: "PLACAR", action: () => this.scene.start("Placar") },
+      //  { text: "PLACAR", action: () => this.scene.start("Placar") },
         { text: "OPÇÕES", action: () => this.abrirOpcoes() },
         { text: "CRÉDITOS", action: () => this.irParaCreditos() }
       ],

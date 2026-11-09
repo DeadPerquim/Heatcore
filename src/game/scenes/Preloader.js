@@ -97,6 +97,10 @@ export class Preloader extends Scene {
     this.load.image('texturas_tileset1', 'assets/sprites/environment/texturas_tileset1.png');
     this.load.image('TilesPedra', 'assets/sprites/environment/TilesPedra.png');
     this.load.image('Espinhos', 'assets/sprites/environment/Espinhos.png');
+    this.load.image('Serra', 'assets/sprites/environment/Serra.png');
+    this.load.image('Lazer', 'assets/sprites/environment/Lazer.png');
+    this.load.image('Caixa', 'assets/sprites/environment/Caixa.png');
+    this.load.image('Botoes', 'assets/sprites/environment/Botões.png');
     this.load.image('logo_heatcore', 'assets/logo_heatcore.png');
 
     this.load.spritesheet('solar_andando', 'assets/sprites/characters/Solar/Andando.png', { frameWidth: 16, frameHeight: 16 });

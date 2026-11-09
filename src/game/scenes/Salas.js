@@ -219,7 +219,7 @@ export class Salas extends Scene {
     }
 
     // ==========================================
-    // OVERLAY DE SELEÇÃO DE MAPAS
+    // OVERLAY DE SELEÇÃO DE MAPAS (COM SCROLL E ANTIDUPLO CLIQUE)
     // ==========================================
     abrirOverlayMapas() {
         if (this.mapOverlayContainer) return;
@@ -230,61 +230,124 @@ export class Salas extends Scene {
         const sh = this.scale.height;
         this.mapOverlayContainer = this.add.container(0, 0).setDepth(2000);
 
+        // Trava temporária contra clique duplo (ignora pointerup por 250ms)
+        let bloquearCliques = true;
+        this.time.delayedCall(250, () => { bloquearCliques = false; });
+
+        // Fundo principal transparente
         let bg = this.add.rectangle(0, 0, sw, sh, 0x000000, 0.90).setOrigin(0).setInteractive();
         this.mapOverlayContainer.add(bg);
 
-        let title = this.add.text(sw/2, 60, "// SELECIONE O SETOR OPERACIONAL", { fontSize: 24, color: "#ff9900", fontFamily: "Courier", fontStyle: "bold", shadow: {blur: 5, color: '#ff9900', fill: true} }).setOrigin(0.5);
-        this.mapOverlayContainer.add(title);
+        // Novo Container Interno exclusivo para deslizar (scroll)
+        this.mapGridContainer = this.add.container(0, 0);
+        this.mapOverlayContainer.add(this.mapGridContainer);
 
-        let gridX = sw/2 - 250;
-        let gridY = 160;
+        const mapasAtivos = [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+        ];
+
+        let gridX = sw/2 - 255; 
+        let gridY = 140; 
         let col = 0;
 
-        for (let i = 1; i <= 15; i++) {
+        let totalRows = Math.ceil(mapasAtivos.length / 4);
+        let contentHeight = 140 + (totalRows * 130);
+        let minScrollY = Math.min(0, sh - contentHeight - 110); 
+
+        let isDragging = false;
+        let startY = 0;
+        let startGridY = 0;
+        let moved = false;
+
+        const iniciarDrag = (pointer) => {
+            isDragging = true;
+            startY = pointer.y;
+            startGridY = this.mapGridContainer.y;
+            moved = false;
+        };
+
+        bg.on('pointerdown', iniciarDrag);
+
+        this._moveListener = (pointer) => {
+            if (isDragging && this.mapGridContainer) {
+                let delta = pointer.y - startY;
+                if (Math.abs(delta) > 5) moved = true;
+                this.mapGridContainer.y = Phaser.Math.Clamp(startGridY + delta, minScrollY, 0);
+            }
+        };
+        this.input.on('pointermove', this._moveListener);
+
+        this._upListener = () => { isDragging = false; };
+        this.input.on('pointerup', this._upListener);
+
+        this._wheelListener = (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
+            if (this.mapGridContainer) {
+                this.mapGridContainer.y -= deltaY * 0.8;
+                this.mapGridContainer.y = Phaser.Math.Clamp(this.mapGridContainer.y, minScrollY, 0);
+            }
+        };
+        this.input.on('wheel', this._wheelListener);
+
+        mapasAtivos.forEach(i => {
             let imgKey = 'preview_mapa' + i;
             let mapExists = this.textures.exists(imgKey);
             
-            if (!mapExists && i > 5) continue; 
-
             let px = gridX + (col * 170);
             let py = gridY;
             
             let box = this.add.rectangle(px, py, 150, 110, 0x111118).setOrigin(0.5).setStrokeStyle(2, 0x444455).setInteractive({useHandCursor: true});
-            this.mapOverlayContainer.add(box);
+            this.mapGridContainer.add(box);
             
             if (mapExists) {
                 let imgMap = this.add.image(px, py - 12, imgKey).setOrigin(0.5);
                 let scale = Math.min(140 / imgMap.width, 75 / imgMap.height);
                 imgMap.setScale(scale);
-                this.mapOverlayContainer.add(imgMap);
+                this.mapGridContainer.add(imgMap);
             } else {
                 let noSignal = this.add.text(px, py - 12, "SEM SINAL", {fontSize: 12, color: "#ff4444", fontFamily: "Courier"}).setOrigin(0.5);
-                this.mapOverlayContainer.add(noSignal);
+                this.mapGridContainer.add(noSignal);
             }
 
             let txtName = this.add.text(px, py + 40, "MAPA " + i, { fontSize: 15, color: "#ffffff", fontFamily: "Courier", fontStyle: "bold" }).setOrigin(0.5);
-            this.mapOverlayContainer.add(txtName);
+            this.mapGridContainer.add(txtName);
 
-            box.on('pointerover', () => { box.setStrokeStyle(2, 0xff9900); });
+            box.on('pointerover', () => { if(!isDragging) box.setStrokeStyle(2, 0xff9900); });
             box.on('pointerout', () => { box.setStrokeStyle(2, 0x444455); });
-            box.on('pointerdown', () => {
-                this.tocarSomCurto();
-                this.configSala.mapaId = i;
-                this.fecharOverlayMapas();
+            
+            box.on('pointerdown', iniciarDrag); 
+            
+            box.on('pointerup', () => {
+                if (!bloquearCliques && !moved) {
+                    this.tocarSomCurto();
+                    this.configSala.mapaId = i;
+                    this.fecharOverlayMapas();
+                }
             });
 
             col++;
             if (col >= 4) { col = 0; gridY += 130; }
-        }
+        });
 
-        let btnFechar = this.add.rectangle(sw/2, sh - 50, 200, 45, 0x330000).setOrigin(0.5).setStrokeStyle(2, 0xff4444).setInteractive({useHandCursor: true});
-        let txtFechar = this.add.text(sw/2, sh - 50, "[ CANCELAR ]", { fontSize: 16, color: "#ff4444", fontFamily: "Courier", fontStyle: "bold" }).setOrigin(0.5);
+        // UI Fixa Topo e Rodapé
+        let bgTop = this.add.rectangle(0, 0, sw, 100, 0x000000, 0.95).setOrigin(0);
+        let title = this.add.text(sw/2, 50, "// SELECIONE O SETOR OPERACIONAL", { fontSize: 24, color: "#ff9900", fontFamily: "Courier", fontStyle: "bold", shadow: {blur: 5, color: '#ff9900', fill: true} }).setOrigin(0.5);
+        let txtScroll = this.add.text(sw/2, 80, "(Use o Scroll do mouse ou arraste para subir/descer)", { fontSize: 12, color: "#8888aa", fontFamily: "Courier" }).setOrigin(0.5);
+        this.mapOverlayContainer.add([bgTop, title, txtScroll]);
+
+        let bgBot = this.add.rectangle(0, sh - 80, sw, 80, 0x000000, 0.95).setOrigin(0);
+        let btnFechar = this.add.rectangle(sw/2, sh - 40, 200, 45, 0x330000).setOrigin(0.5).setStrokeStyle(2, 0xff4444).setInteractive({useHandCursor: true});
+        let txtFechar = this.add.text(sw/2, sh - 40, "[ CANCELAR ]", { fontSize: 16, color: "#ff4444", fontFamily: "Courier", fontStyle: "bold" }).setOrigin(0.5);
+        
         btnFechar.on('pointerdown', () => { this.tocarSomCurto(); this.fecharOverlayMapas(); });
-        this.mapOverlayContainer.add([btnFechar, txtFechar]);
+        this.mapOverlayContainer.add([bgBot, btnFechar, txtFechar]);
     }
 
     fecharOverlayMapas() {
         if (this.mapOverlayContainer) {
+            if (this._moveListener) this.input.off('pointermove', this._moveListener);
+            if (this._upListener) this.input.off('pointerup', this._upListener);
+            if (this._wheelListener) this.input.off('wheel', this._wheelListener);
+
             this.mapOverlayContainer.destroy();
             this.mapOverlayContainer = null;
             this.atualizarInterfaceAtual();
@@ -371,7 +434,6 @@ export class Salas extends Scene {
         if (this.textures.exists('Personagens')) {
             let tex = this.textures.get('Personagens');
             
-            // GARANTIR QUE OS FRAMES DE RECORTES EXISTEM AQUI
             if (!tex.has('preview_solar_frame') || !tex.has('preview_fornalha_frame')) {
                 let img = tex.getSourceImage();
                 let halfW = Math.floor(img.width / 2);
@@ -407,6 +469,13 @@ export class Salas extends Scene {
                 this.painelContainer.add(this.add.text(xDir + pW/2, yMap + pH/2, "SINAL DE VÍDEO\nNÃO ENCONTRADO", { fontSize: 13, color: "#ff4444", fontFamily: "Courier", align: "center" }).setOrigin(0.5));
             }
         }
+
+        // ---- AVISO DE USO EXCLUSIVO TECLADO/MOUSE ----
+        let yAviso = this.scale.height - 75;
+        let avisoTxt = this.add.text(50, yAviso, "⚠️ NOTA: Esta seção de configuração requer uso exclusivo de Teclado e Mouse.", {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#ffaa00"
+        }).setAlpha(0.8);
+        this.painelContainer.add(avisoTxt);
 
         // ---- BOTÕES INFERIORES FIXADOS NO RODAPÉ ----
         let yBotao = this.scale.height - 30; 
@@ -450,6 +519,13 @@ export class Salas extends Scene {
         });
 
         this.criarBotaoEstilizado(this.scale.width - 250, 135, 210, 40, "[ ATUALIZAR RADAR ]", () => { this.tocarSomCurto(); this.socket.emit('solicitarSalasPublicas'); });
+        
+        let yAviso = this.scale.height - 75;
+        let avisoTxt = this.add.text(50, yAviso, "⚠️ NOTA: Esta seção de configuração requer uso exclusivo de Teclado e Mouse.", {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#ffaa00"
+        }).setAlpha(0.8);
+        this.painelContainer.add(avisoTxt);
+
         this.criarBotaoEstilizado(50, this.scale.height - 30, 120, 40, "VOLTAR", () => { this.tocarSomCurto(); this.voltarProMenu(); }, 0x330000, 0xff4444, "#ff4444");
     }
 
@@ -464,6 +540,12 @@ export class Salas extends Scene {
                 this.socket.emit('entrarSala', { salaId: this.codigoDigitado, nick: this.configSala.hostNick });
             }
         }, 0x004422, 0x00ff66, "#00ff66");
+
+        let yAviso = this.scale.height - 75;
+        let avisoTxt = this.add.text(50, yAviso, "⚠️ NOTA: Esta seção de configuração requer uso exclusivo de Teclado e Mouse.", {
+            fontFamily: "'Courier New', Courier, monospace", fontSize: 11, color: "#ffaa00"
+        }).setAlpha(0.8);
+        this.painelContainer.add(avisoTxt);
 
         this.criarBotaoEstilizado(50, this.scale.height - 30, 120, 40, "VOLTAR", () => { this.tocarSomCurto(); this.voltarProMenu(); }, 0x330000, 0xff4444, "#ff4444");
     }
@@ -488,7 +570,6 @@ export class Salas extends Scene {
             if (this.textures.exists('Personagens')) {
                 let tex = this.textures.get('Personagens');
                 
-                // CORREÇÃO: GARANTIR QUE OS FRAMES EXISTEM TAMBÉM NA TELA DO CONVIDADO
                 if (!tex.has('preview_solar_frame') || !tex.has('preview_fornalha_frame')) {
                     let img = tex.getSourceImage();
                     let halfW = Math.floor(img.width / 2);
