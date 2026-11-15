@@ -5,6 +5,13 @@ export class Creditos extends Scene {
     super("Creditos");
   }
 
+  preload() {
+    // Garante o carregamento caso a textura ainda não esteja no cache global
+    if (!this.textures.exists('concept')) {
+      this.load.image('concept', 'assets/concept.png');
+    }
+  }
+
   create() {
     const { width, height } = this.scale;
 
@@ -25,16 +32,16 @@ export class Creditos extends Scene {
 
     let somAmbiente = this.sound.get('ambientacao');
     if (somAmbiente && somAmbiente.isPlaying) {
-        somAmbiente.stop();
+      somAmbiente.stop();
     }
 
     // Luzes ambiente pulsantes
     this.glowAmber = this.add.circle(width * 0.25, height * 0.5, 240, 0xff5500, 0.12)
-        .setBlendMode(Phaser.BlendModes.ADD)
-        .setDepth(1);
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(1);
     this.glowCyan = this.add.circle(width * 0.75, height * 0.5, 240, 0x00f3ff, 0.08)
-        .setBlendMode(Phaser.BlendModes.ADD)
-        .setDepth(1);
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(1);
 
     this.tweens.add({
       targets: this.glowAmber,
@@ -115,13 +122,13 @@ export class Creditos extends Scene {
     this.add.rectangle(width / 2, 80, width, 180, 0x080910, 1).setDepth(140);
 
     this.logoGlow = this.add.circle(width / 2, topoY, 95, 0xff6600, 0.22)
-        .setBlendMode(Phaser.BlendModes.ADD)
-        .setDepth(150);
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(150);
 
     if (this.textures.exists('logo_heatcore')) {
       this.logoHeader = this.add.image(width / 2, topoY, 'logo_heatcore')
-          .setScale(0.52)
-          .setDepth(151);
+        .setScale(0.52)
+        .setDepth(151);
     } else {
       this.logoHeader = this.add.text(width / 2, topoY, "HEATCORE", {
         fontFamily: "'Courier New', Courier, monospace", fontSize: 34, color: "#ff9900", fontStyle: "bold"
@@ -135,8 +142,8 @@ export class Creditos extends Scene {
     // ==========================================
     // 4. CRÉDITOS ROLANTES COM MÁSCARA ISOLADA
     // ==========================================
-    this.limiteTopo = 165; 
-    const limiteRodape = height - 50; 
+    this.limiteTopo = 165;
+    const limiteRodape = height - 50;
     const alturaJanela = limiteRodape - this.limiteTopo;
 
     const maskGraphics = this.make.graphics({ add: false });
@@ -218,20 +225,91 @@ export class Creditos extends Scene {
       offsetY += 40;
     });
 
-    this.alturaTotalCreditos = offsetY;
-    
+    // ==========================================
+    // 5. CONCEPT ART FINAL & CRÉDITO KOSMONAUTA
+    // ==========================================
+    offsetY += 20;
+
+    const maxLarguraImg = Math.min(width * 0.72, 560);
+    const maxAlturaImg = alturaJanela * 0.62;
+
+    let imgW = maxLarguraImg;
+    let imgH = maxAlturaImg;
+    let imgConcept = null;
+
+    if (this.textures.exists('concept')) {
+      imgConcept = this.add.image(0, 0, 'concept');
+      const escala = Math.min(maxLarguraImg / imgConcept.width, maxAlturaImg / imgConcept.height);
+      imgConcept.setScale(escala);
+      imgW = imgConcept.displayWidth;
+      imgH = imgConcept.displayHeight;
+    }
+
+    // Posição local centralizada para o quadro da concept art dentro do container
+    this.conceptLocalY = offsetY + (imgH / 2);
+    this.centroJanelaY = this.limiteTopo + (alturaJanela / 2) - 12;
+
+    const blocoConcept = this.add.container(0, this.conceptLocalY);
+
+    // Moldura industrial combinando com a HUD
+    const moldura = this.add.graphics();
+    moldura.fillStyle(0x080910, 0.85);
+    moldura.fillRect(-imgW / 2 - 6, -imgH / 2 - 6, imgW + 12, imgH + 12);
+    moldura.lineStyle(2, 0x00f3ff, 0.85);
+    moldura.strokeRect(-imgW / 2 - 6, -imgH / 2 - 6, imgW + 12, imgH + 12);
+
+    // Detalhes de canto em laranja (#ff9900)
+    const canto = 14;
+    moldura.lineStyle(3, 0xff9900, 1);
+    // Superior esquerdo
+    moldura.lineBetween(-imgW / 2 - 8, -imgH / 2 - 8 + canto, -imgW / 2 - 8, -imgH / 2 - 8);
+    moldura.lineBetween(-imgW / 2 - 8, -imgH / 2 - 8, -imgW / 2 - 8 + canto, -imgH / 2 - 8);
+    // Superior direito
+    moldura.lineBetween(imgW / 2 + 8 - canto, -imgH / 2 - 8, imgW / 2 + 8, -imgH / 2 - 8);
+    moldura.lineBetween(imgW / 2 + 8, -imgH / 2 - 8, imgW / 2 + 8, -imgH / 2 - 8 + canto);
+    // Inferior esquerdo
+    moldura.lineBetween(-imgW / 2 - 8, imgH / 2 + 8 - canto, -imgW / 2 - 8, imgH / 2 + 8);
+    moldura.lineBetween(-imgW / 2 - 8, imgH / 2 + 8, -imgW / 2 - 8 + canto, imgH / 2 + 8);
+    // Inferior direito
+    moldura.lineBetween(imgW / 2 + 8 - canto, imgH / 2 + 8, imgW / 2 + 8, imgH / 2 + 8);
+    moldura.lineBetween(imgW / 2 + 8, imgH / 2 + 8, imgW / 2 + 8, imgH / 2 + 8 - canto);
+
+    blocoConcept.add(moldura);
+
+    if (imgConcept) {
+      blocoConcept.add(imgConcept);
+    }
+
+    const txtConcept = this.add.text(0, (imgH / 2) + 26, "Arte conceitual feito por Kosmonauta", {
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: 16,
+      color: "#ff9900",
+      fontStyle: "bold",
+      stroke: "#000000",
+      strokeThickness: 3,
+      align: "center"
+    }).setOrigin(0.5);
+
+    blocoConcept.add(txtConcept);
+
+    this.containerCreditos.add(blocoConcept);
+    this.alturaTotalCreditos = this.conceptLocalY + (imgH / 2) + 50;
+
     // ==========================================
     // CONTROLES DE VELOCIDADE FLUIDA
     // ==========================================
     this.velocidadeRolagemBase = 25;
     this.velocidadeRolagemRapida = 160;
-    this.velocidadeRolagemAtual = this.velocidadeRolagemBase; // Começa na velocidade normal
+    this.velocidadeRolagemAtual = this.velocidadeRolagemBase;
+
+    this.conceptCentralizada = false;
+    this.tempoExibicaoConcept = 0;
 
     this.teclaEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.teclaEspaco = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.teclaShift = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
     this.teclaEnter = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-    
+
     this.jaSaindo = false;
   }
 
@@ -242,50 +320,60 @@ export class Creditos extends Scene {
     const pad = this.input.gamepad ? (this.input.gamepad.pad1 || this.input.gamepad.getPad(0)) : null;
 
     const isBtnPressed = (padObj, index) => {
-        if (padObj && padObj.buttons && padObj.buttons[index]) {
-            const btn = padObj.buttons[index];
+      if (padObj && padObj.buttons && padObj.buttons[index]) {
+        const btn = padObj.buttons[index];
+        if (typeof btn === 'object' && (btn.pressed || btn.value > 0.5)) return true;
+        if (typeof btn === 'number' && btn > 0.5) return true;
+      }
+      if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+        const rawPads = navigator.getGamepads();
+        for (let i = 0; i < rawPads.length; i++) {
+          const rp = rawPads[i];
+          if (rp && rp.buttons && rp.buttons[index]) {
+            const btn = rp.buttons[index];
             if (typeof btn === 'object' && (btn.pressed || btn.value > 0.5)) return true;
             if (typeof btn === 'number' && btn > 0.5) return true;
+          }
         }
-        if (typeof navigator !== 'undefined' && navigator.getGamepads) {
-            const rawPads = navigator.getGamepads();
-            for (let i = 0; i < rawPads.length; i++) {
-                const rp = rawPads[i];
-                if (rp && rp.buttons && rp.buttons[index]) {
-                    const btn = rp.buttons[index];
-                    if (typeof btn === 'object' && (btn.pressed || btn.value > 0.5)) return true;
-                    if (typeof btn === 'number' && btn > 0.5) return true;
-                }
-            }
-        }
-        return false;
+      }
+      return false;
     };
 
     // 1. Lógica para SAIR (Voltar/Sair/Select/Start ou B1(B))
     if (Phaser.Input.Keyboard.JustDown(this.teclaEsc) || isBtnPressed(pad, 1) || isBtnPressed(pad, 8) || isBtnPressed(pad, 9)) {
-        this.voltarParaMenu();
-        return;
+      this.voltarParaMenu();
+      return;
     }
 
     // 2. Lógica para ACELERAR (Espaço/Shift/Enter ou B0/B2)
     let acelerando = this.teclaEspaco.isDown || this.teclaShift.isDown || this.teclaEnter.isDown;
     if (isBtnPressed(pad, 0) || isBtnPressed(pad, 2) || (pad && pad.A)) {
-        acelerando = true;
+      acelerando = true;
     }
 
-    // 3. Aplicação do Efeito de Aceleração/Desaceleração Fluida (Lerp)
+    const deltaSegundos = delta / 1000;
+
+    // 3. Pausa suave quando a Concept Art chega ao centro da janela
+    if (this.conceptCentralizada) {
+      this.tempoExibicaoConcept += acelerando ? deltaSegundos * 3 : deltaSegundos;
+      if (this.tempoExibicaoConcept >= 4.5) {
+        this.voltarParaMenu();
+      }
+      return;
+    }
+
+    // 4. Aplicação do Efeito de Aceleração/Desaceleração Fluida (Lerp)
     const velocidadeAlvo = acelerando ? this.velocidadeRolagemRapida : this.velocidadeRolagemBase;
-    
-    // O valor 0.08 define quão 'pesado' é o letreiro (menor = demora mais pra acelerar/frear, maior = responde mais seco)
     this.velocidadeRolagemAtual += (velocidadeAlvo - this.velocidadeRolagemAtual) * 0.08;
 
-    // 4. Movimenta o Container
-    const deltaSegundos = delta / 1000;
+    // 5. Movimenta o Container
     this.containerCreditos.y -= this.velocidadeRolagemAtual * deltaSegundos;
 
-    // 5. Verifica se os créditos terminaram de rolar
-    if (this.containerCreditos.y < this.limiteTopo - this.alturaTotalCreditos - 150) {
-      this.voltarParaMenu();
+    // 6. Trava a Concept Art no centro da tela ao chegar no final
+    const posAtualConceptY = this.containerCreditos.y + this.conceptLocalY;
+    if (posAtualConceptY <= this.centroJanelaY) {
+      this.containerCreditos.y = this.centroJanelaY - this.conceptLocalY;
+      this.conceptCentralizada = true;
     }
   }
 

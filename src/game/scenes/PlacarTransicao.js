@@ -216,7 +216,7 @@ export class PlacarTransicao extends Scene {
             this.textoPlacar.setShadow(0, 0, '#00ff66', 15, true);
 
             // Se o próximo destino for os Créditos, inicia a celebração de vitória
-            if (this.proximaCena === 'Creditos') {
+            if (this.proximaCena === 'Avaliar') {
                 this.time.delayedCall(1200, () => {
                     this.executarAnimacaoVitoriaGeral(width, height, cX, cY);
                 });

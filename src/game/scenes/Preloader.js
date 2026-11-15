@@ -106,6 +106,7 @@ export class Preloader extends Scene {
     this.load.image('Botoes', 'assets/sprites/environment/Botoes.png');
     this.load.image('Portas', 'assets/sprites/environment/Portas.png');
     this.load.image('logo_heatcore', 'assets/logo_heatcore.png');
+    this.load.image('concept', 'assets/concept.png');
 
     this.load.spritesheet('solar_andando', 'assets/sprites/characters/Solar/Andando.png', { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('solar_caindo', 'assets/sprites/characters/Solar/Caindo.png', { frameWidth: 16, frameHeight: 16 });
