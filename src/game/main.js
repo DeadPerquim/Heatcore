@@ -5,6 +5,8 @@ import { Mapa2 } from "./scenes/Mapa2";
 import { Mapa3 } from "./scenes/Mapa3";
 import { Mapa4 } from "./scenes/Mapa4";
 import { Mapa5 } from "./scenes/Mapa5";
+import { Mapa6 } from "./scenes/Mapa6";
+import { Mapa7 } from "./scenes/Mapa7";
 import { GameOver } from "./scenes/GameOver";
 import { MainMenu } from "./scenes/MainMenu";
 import { Preloader } from "./scenes/Preloader";
@@ -39,7 +41,7 @@ const config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [Boot, Preloader, MainMenu, MainGame, GameOver, Mapa1, Mapa2, Mapa3, Mapa4, Mapa5, Diario, PlacarTransicao, Creditos, Salas, Avaliar],
+  scene: [Boot, Preloader, MainMenu, MainGame, GameOver, Mapa1, Mapa2, Mapa3, Mapa4, Mapa5, Mapa6, Mapa7, Diario, PlacarTransicao, Creditos, Salas, Avaliar],
 };
 
 const StartGame = (parent) => {

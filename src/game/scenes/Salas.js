@@ -243,7 +243,7 @@ export class Salas extends Scene {
         this.mapOverlayContainer.add(this.mapGridContainer);
 
         const mapasAtivos = [
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+            1, 2, 3, 4, 5, 6, 7
         ];
 
         let gridX = sw/2 - 255; 
