@@ -54,9 +54,10 @@ io.on('connection', (socket) => {
             },
             estado: 'LOBBY', // 'LOBBY' ou 'JOGANDO'
             posicoes: { 
-                solar: { x: 0, y: 0, cena: null, pronto: false }, 
-                fornalha: { x: 0, y: 0, cena: null, pronto: false } 
-            }
+                solar: { x: 0, y: 0, vx: 0, vy: 0, cena: null, pronto: false, empurrandoCaixa: 0, correndo: false }, 
+                fornalha: { x: 0, y: 0, vx: 0, vy: 0, cena: null, pronto: false, empurrandoCaixa: 0, correndo: false } 
+            },
+            caixa: null
         };
 
         socket.join(salaId);
@@ -114,6 +115,7 @@ io.on('connection', (socket) => {
             }
 
             salas[salaId].estado = 'JOGANDO';
+            salas[salaId].caixa = null;
             io.to(salaId).emit('partidaIniciada', salas[salaId]);
             io.emit('listaSalasAtualizada', obterSalasPublicas());
         }
@@ -135,22 +137,44 @@ io.on('connection', (socket) => {
         if (jogador) {
             salas[salaId].posicoes[jogador.personagem] = { 
                 x: data.x, 
-                y: data.y, 
+                y: data.y,
+                vx: data.vx || 0,
+                vy: data.vy || 0,
                 cena: data.cena,
-                pronto: data.pronto 
+                pronto: data.pronto,
+                empurrandoCaixa: data.empurrandoCaixa || 0,
+                correndo: Boolean(data.correndo)
             };
-            io.to(salaId).emit('atualizarPosicoes', salas[salaId].posicoes);
+
+            if (data.caixa) {
+                salas[salaId].caixa = {
+                    x: data.caixa.x,
+                    y: data.caixa.y,
+                    vx: data.caixa.vx || 0,
+                    vy: data.caixa.vy || 0
+                };
+            }
+
+            io.to(salaId).emit('atualizarPosicoes', {
+                solar: salas[salaId].posicoes.solar,
+                fornalha: salas[salaId].posicoes.fornalha,
+                caixa: salas[salaId].caixa
+            });
         }
     });
 
     socket.on('faseConcluida', (dados) => {
         if (socket.salaAtual) {
+            salas[socket.salaAtual].caixa = null;
             socket.to(socket.salaAtual).emit('irParaTransicao', dados);
         }
     });
 
     socket.on('faseDiarioConcluida', () => {
-        if (socket.salaAtual) io.to(socket.salaAtual).emit('voltarAoMenuGeral');
+        if (socket.salaAtual) {
+            salas[socket.salaAtual].caixa = null;
+            io.to(socket.salaAtual).emit('voltarAoMenuGeral');
+        }
     });
 
     socket.on('disconnect', () => {

@@ -103,11 +103,16 @@ export class Mapa2 extends Scene {
         const chaveSpriteOutro = this.outroPersonagemTipo === 'solar' ? 'solar_andando' : 'fornalha_andando';
 
         this.outroSprite = this.physics.add.sprite(coordOutro.x, coordOutro.y, chaveSpriteOutro).setAlpha(0.9).setDepth(50);
+        this.outroSprite.setCircle(8);
         this.outroSprite.setVisible(false);
         this.outroSprite.body.setAllowGravity(false); 
-        
-        // CORREÇÃO: Desativa a física do outro jogador caso ele não exista no momento
         this.outroSprite.body.setEnable(false); 
+
+        // Variáveis de controle de sincronização da caixa
+        this.outroJogadorNaCena = false;
+        this.meuEmpurrao = 0;
+        this.outroEmpurrao = 0;
+        this.outroCorrendo = false;
 
         // ==========================================
         // 2. SISTEMA DA CAIXA DE EMPURRAR
@@ -128,6 +133,9 @@ export class Mapa2 extends Scene {
                 }
             });
         }
+
+        this.caixaSpawnX = caixaX;
+        this.caixaSpawnY = caixaY;
 
         this.caixa = this.physics.add.sprite(caixaX, caixaY, 'Caixa');
         this.caixa.setDisplaySize(16, 16); 
@@ -152,28 +160,24 @@ export class Mapa2 extends Scene {
                 const dadosOutro = posicoes[this.outroPersonagemTipo];
                 
                 if (dadosOutro && this.outroSprite) {
-                    // Se o outro jogador saiu ou está em outra cena:
                     if ((dadosOutro.x === 0 && dadosOutro.y === 0) || (dadosOutro.cena && dadosOutro.cena !== this.scene.key)) {
+                        this.outroJogadorNaCena = false;
+                        this.outroEmpurrao = 0;
+                        this.outroCorrendo = false;
                         this.outroSprite.setVisible(false);
-                        this.outroSprite.body.setEnable(false); // Remove a colisão "fantasma" dele
+                        this.outroSprite.body.setEnable(false);
                     } else {
-                        // Se o outro jogador está aqui, ativamos a visibilidade e a física dele
+                        this.outroJogadorNaCena = true;
                         this.outroSprite.body.setEnable(true); 
-                        this.outroSprite.x = dadosOutro.x;
-                        this.outroSprite.y = dadosOutro.y;
+                        this.outroSprite.setPosition(dadosOutro.x, dadosOutro.y);
+                        this.outroSprite.body.setVelocity(dadosOutro.vx || 0, dadosOutro.vy || 0);
                         this.outroSprite.setVisible(true);
 
-                        // SYNC DA CAIXA
-                        if (dadosOutro.caixa && this.caixa) {
-                            const distMinha = Phaser.Math.Distance.Between(this.jogadorAtual.x, this.jogadorAtual.y, this.caixa.x, this.caixa.y);
-                            const distOutro = Phaser.Math.Distance.Between(dadosOutro.x, dadosOutro.y, this.caixa.x, this.caixa.y);
-                            
-                            if (distOutro < distMinha) {
-                                this.caixa.x = Phaser.Math.Linear(this.caixa.x, dadosOutro.caixa.x, 0.5);
-                                this.caixa.y = Phaser.Math.Linear(this.caixa.y, dadosOutro.caixa.y, 0.5);
-                                this.caixa.setVelocity(dadosOutro.caixa.vx, dadosOutro.caixa.vy);
-                            }
-                        }
+                        if ((dadosOutro.vx || 0) < -5) this.outroSprite.setFlipX(true);
+                        else if ((dadosOutro.vx || 0) > 5) this.outroSprite.setFlipX(false);
+
+                        this.outroEmpurrao = dadosOutro.empurrandoCaixa || 0;
+                        this.outroCorrendo = Boolean(dadosOutro.correndo);
 
                         // LÓGICA DE RECEBER CHUTE
                         if (dadosOutro.pronto === 'chutou' && !this.levouChute && this.jogadorAtual && !this.jogadorAtual.estaRenascendo) {
@@ -191,12 +195,28 @@ export class Mapa2 extends Scene {
 
                         if (this.timeoutOutroJogador) clearTimeout(this.timeoutOutroJogador);
                         this.timeoutOutroJogador = setTimeout(() => {
+                            this.outroJogadorNaCena = false;
+                            this.outroEmpurrao = 0;
+                            this.outroCorrendo = false;
                             if (this.outroSprite) {
                                 this.outroSprite.setVisible(false);
-                                this.outroSprite.body.setEnable(false); // Também desativa a colisão se houver timeout
+                                this.outroSprite.body.setEnable(false);
                             }
                         }, 2500);
                     }
+                }
+
+                // SYNC DA CAIXA (Cliente não-autoridade segue o estado oficial da sala)
+                const souAutoridadeCaixa = (this.personagemInicial === 'solar') || !this.outroJogadorNaCena;
+                if (!souAutoridadeCaixa && posicoes.caixa && this.caixa) {
+                    const distCaixa = Phaser.Math.Distance.Between(this.caixa.x, this.caixa.y, posicoes.caixa.x, posicoes.caixa.y);
+                    if (distCaixa > 80) {
+                        this.caixa.setPosition(posicoes.caixa.x, posicoes.caixa.y);
+                    } else {
+                        this.caixa.x = Phaser.Math.Linear(this.caixa.x, posicoes.caixa.x, 0.55);
+                        this.caixa.y = Phaser.Math.Linear(this.caixa.y, posicoes.caixa.y, 0.55);
+                    }
+                    this.caixa.setVelocity(posicoes.caixa.vx || 0, posicoes.caixa.vy || 0);
                 }
             });
         }
@@ -594,6 +614,13 @@ export class Mapa2 extends Scene {
         
         const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
         const limiteQueda = this.mapaAlturaTotal + 20;
+        const souAutoridadeCaixa = (this.personagemInicial === 'solar') || !this.outroJogadorNaCena;
+
+        // Respawn da caixa se ela cair fora do mapa (gerenciado pela autoridade)
+        if (souAutoridadeCaixa && this.caixa && this.caixa.y > limiteQueda) {
+            this.caixa.setPosition(this.caixaSpawnX, this.caixaSpawnY);
+            this.caixa.setVelocity(0, 0);
+        }
         
         if (this.jogadorAtual && this.jogadorAtual.y > limiteQueda && !this.jogadorAtual.estaRenascendo) {
             this.jogadorAtual.estaRenascendo = true;
@@ -624,16 +651,6 @@ export class Mapa2 extends Scene {
 
         if (this.escuroAtivo && this.escuridaoSprite) {
             this.escuridaoSprite.setPosition(activePlayer.x, activePlayer.y);
-        }
-
-        if (this.socket) {
-            this.socket.emit('enviarPosicao', { 
-                x: activePlayer.x, 
-                y: activePlayer.y,
-                cena: this.scene.key,
-                pronto: this.isKicking ? 'chutou' : false,
-                caixa: this.caixa ? { x: this.caixa.x, y: this.caixa.y, vx: this.caixa.body.velocity.x, vy: this.caixa.body.velocity.y } : null
-            });
         }
 
         const body = activePlayer.body;
@@ -717,7 +734,6 @@ export class Mapa2 extends Scene {
                 );
                 
                 if (dist <= 70) {
-                    const volSFX = this.game.volumeSFX !== undefined ? this.game.volumeSFX : 0.7;
                     this.sound.play('sfx_bater', { volume: volSFX });
                 }
             }
@@ -804,6 +820,63 @@ export class Mapa2 extends Scene {
                 }
             }
             activePlayer.setVelocityX(vx);
+        }
+
+        // ==========================================
+        // 5. FÍSICA COOPERATIVA / CABO DE GUERRA DA CAIXA
+        // ==========================================
+        this.meuEmpurrao = 0;
+        if (this.caixa && !this.jogadorAtual.stunned) {
+            const diffX = this.caixa.x - activePlayer.x;
+            const diffY = Math.abs(this.caixa.y - activePlayer.y);
+            if (diffY < 18) {
+                if (indoDireita && diffX > 0 && diffX <= 22) {
+                    this.meuEmpurrao = 1;
+                } else if (indoEsquerda && diffX < 0 && diffX >= -22) {
+                    this.meuEmpurrao = -1;
+                }
+            }
+        }
+
+        if (souAutoridadeCaixa && this.caixa) {
+            if (this.meuEmpurrao !== 0 && this.outroEmpurrao !== 0 && this.meuEmpurrao !== this.outroEmpurrao) {
+                // Os dois estão empurrando em sentidos opostos: se atrapalham!
+                if (estaCorrendo === this.outroCorrendo) {
+                    this.caixa.setVelocityX(0);
+                } else if (estaCorrendo) {
+                    this.caixa.setVelocityX(this.meuEmpurrao * 55);
+                } else {
+                    this.caixa.setVelocityX(this.outroEmpurrao * 55);
+                }
+            } else if (this.meuEmpurrao !== 0 && this.meuEmpurrao === this.outroEmpurrao) {
+                // Os dois estão empurrando na mesma direção: empurram mais rápido
+                const velCoop = (estaCorrendo || this.outroCorrendo) ? 200 : 140;
+                this.caixa.setVelocityX(this.meuEmpurrao * velCoop);
+            } else if (this.meuEmpurrao === 0 && this.outroEmpurrao !== 0) {
+                // Apenas o jogador remoto está empurrando a caixa
+                const velOutro = this.outroCorrendo ? 160 : 100;
+                this.caixa.setVelocityX(this.outroEmpurrao * velOutro);
+            }
+        }
+
+        // Envia posição, velocidade, intenção de empurrão e estado da caixa (se autoridade)
+        if (this.socket) {
+            this.socket.emit('enviarPosicao', { 
+                x: activePlayer.x, 
+                y: activePlayer.y,
+                vx: activePlayer.body.velocity.x,
+                vy: activePlayer.body.velocity.y,
+                cena: this.scene.key,
+                pronto: this.isKicking ? 'chutou' : false,
+                empurrandoCaixa: this.meuEmpurrao,
+                correndo: estaCorrendo,
+                caixa: (souAutoridadeCaixa && this.caixa) ? { 
+                    x: this.caixa.x, 
+                    y: this.caixa.y, 
+                    vx: this.caixa.body.velocity.x, 
+                    vy: this.caixa.body.velocity.y 
+                } : null
+            });
         }
 
         const char = this.personagemInicial; 
